@@ -68,6 +68,9 @@ class Task
 	public:	double getMaxGm() const;
 	public:	double getMaxGmLeqFraction(double fraction) const;
 
+	// Get the maximum task GPU fractional requirement
+	public: double getMaxF() const;
+
 	// Get the total CPU time required by the task in the period
 	public: double getE() const;
 

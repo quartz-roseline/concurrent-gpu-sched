@@ -146,7 +146,7 @@ double calculate_blocking_hybrid_diff(unsigned int index, const std::vector<Task
 		return blocking;
 
 	// Get the direct blocking
-	blocking = calculate_hybrid_lp_direct_blocking(index, task_vector, resp_time_hp, resp_time);
+	blocking = blocking + calculate_hybrid_lp_direct_blocking(index, task_vector, resp_time_hp, resp_time);
 
 	return blocking;
 }

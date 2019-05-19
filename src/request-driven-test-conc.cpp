@@ -1,9 +1,9 @@
 /*
- * @file request-driven-test.cpp
- * @brief Implementing the request-driven schedulability test (for non-concurrent GPUs)
+ * @file request-driven-test-conc.cpp
+ * @brief Implementing the request-driven schedulability test for concurrent GPUs
  * @author Sandeep D'souza 
  * 
- * Copyright (c) Carnegie Mellon University, 2018. All rights reserved.
+ * Copyright (c) Carnegie Mellon University, 2019. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, 
  * are permitted provided that the following conditions are met:
@@ -37,6 +37,9 @@
 #include "taskset.hpp"
 #include "config.hpp"
 
+// Wavefront liquefaction flag
+bool wavefront_liquefaction = false;
+
 /**************** Calculate Prioritized Blocking using the request-driven approach sub-routine ********************/ 
 double calculate_prioritized_blocking_rdc(unsigned int index, const std::vector<Task> &task_vector)
 {
@@ -68,6 +71,8 @@ double calculate_liquefaction_mass_rdc(unsigned int index, unsigned int req_inde
 	double beta;
 	unsigned int num_gpu_segments;
 	double fraction = task_vector[index].getF(req_index);
+	double blocking_fraction = 1 - fraction + (1.0/double(GPU_FRACTION_GRANULARITY));
+	double req_fraction;
 
 	// Iterate over all tasks to calculate blocking
 	for (unsigned int i = 0; i < task_vector.size(); i++)
@@ -80,10 +85,15 @@ double calculate_liquefaction_mass_rdc(unsigned int index, unsigned int req_inde
 			{
 				if (task_vector[i].getGe(req_ind) != 0)
 				{
+					req_fraction = task_vector[i].getF(req_ind);
 					// Consider all requests for high-prio tasks, and only smaller (fraction) requests for low-prio tasks
-					if (i < index || task_vector[i].getF(req_ind) < fraction )
+					if (i < index || req_fraction < fraction )
 					{
-						mass = mass + beta*(task_vector[i].getH(req_ind)*task_vector[i].getF(req_ind));
+						// Handle edge case optimization if the request fraction is bigger than the blocking fraction
+						if (req_fraction <= blocking_fraction)
+							mass = mass + beta*(task_vector[i].getH(req_ind)*req_fraction);
+						else
+							mass = mass + beta*(task_vector[i].getH(req_ind)*blocking_fraction);
 					}
 				}
 			}
@@ -91,21 +101,26 @@ double calculate_liquefaction_mass_rdc(unsigned int index, unsigned int req_inde
 	}
 	return mass;
 }
+
 /**************** Calculate Per-Request Direct Blocking sub-routine ********************/ 
 double calculate_request_direct_blocking_rdc(unsigned int index, unsigned int req_index, const std::vector<Task> &task_vector, const std::vector<double> &resp_time_hp)
 {
-	double blocking, blocking_dash, beta;
+	double blocking = 0;
+	double blocking_dash;
+	double init_blocking = 0;
 	unsigned int num_gpu_segments;
 	double fraction = task_vector[index].getF(req_index);
 	double blocking_fraction = 1 - fraction + (1.0/double(GPU_FRACTION_GRANULARITY));
 	double left_over_fraction = blocking_fraction;
-	double wavefront_req_fraction;
-	double liquefied_mass;
+	double wavefront_req_fraction = 0;
+	double liquefied_mass = 0 ;
 	double liquefied_mass_used = 0;
-	double required_mass;
+	double required_mass = 0;
+	double wavefront_liquefaction_mass = 0;
 	int num_biggest = 0;
 	unsigned int instant = 0;
-	unsigned int prev_instant;
+	unsigned int prev_instant = 0;
+	unsigned int num_bins, prev_num_bins;
 	std::vector<double> wavefront_length;
 	std::vector<double> wavefront_bin_fraction;
 
@@ -125,45 +140,86 @@ double calculate_request_direct_blocking_rdc(unsigned int index, unsigned int re
 		left_over_fraction = left_over_fraction - wavefront_req_fraction;
 		wavefront_length.push_back(Hl_max);
 		wavefront_bin_fraction.push_back(left_over_fraction);
+
+		// add an optimization for the request bigger than the blocking fraction (if we use wavefront liquefaction)
+		if (wavefront_req_fraction > blocking_fraction)
+			wavefront_req_fraction = blocking_fraction;
+
+		wavefront_liquefaction_mass = wavefront_liquefaction_mass + Hl_max*wavefront_req_fraction;
 	}
 
 	// Do liquefaction for the first k partially-filled bins occupied by the wavefront
-	for (unsigned int i = num_biggest - 1; i >= 0; i--)
+	if (!wavefront_liquefaction)
 	{
-		prev_instant = instant;
-		// Bin already full, discard
-		if (wavefront_bin_fraction[i] <= 0)
+		for (unsigned int i = num_biggest - 1; i >= 0; i--)
 		{
+			prev_instant = instant;
+			// Bin already full, discard
+			if (wavefront_bin_fraction[i] <= 0)
+			{
+				// Get the next instant at which we calculate the liquefied mass
+				instant = (unsigned int)wavefront_length[i];
+				continue;
+			}
+
+			// Get liquefied mass
+			liquefied_mass = calculate_liquefaction_mass_rdc(index, req_index, instant, task_vector, resp_time_hp) 
+							 - liquefied_mass_used;
+
 			// Get the next instant at which we calculate the liquefied mass
 			instant = (unsigned int)wavefront_length[i];
-			continue;
+
+			// Get the required mass of the set of bins
+			required_mass = (instant - prev_instant)*wavefront_bin_fraction[i];
+
+			num_bins = 0;
+			prev_num_bins = 0;
+			// If liquefied mass is less than required mass
+			while (liquefied_mass < required_mass)
+			{
+				num_bins = (unsigned int)floor((liquefied_mass/required_mass)*(instant - prev_instant));
+				// Check if the recurrence has converged -> return the blocking
+				if (prev_num_bins == num_bins)
+				{
+					blocking = prev_instant + num_bins;
+					return blocking;
+				}
+
+				// Get new mass at new instant
+				liquefied_mass = calculate_liquefaction_mass_rdc(index, req_index, prev_instant+num_bins, task_vector, resp_time_hp)
+								 - liquefied_mass_used;
+				prev_num_bins = num_bins;
+			}
+
+			// Account for used mass
+			liquefied_mass_used = liquefied_mass_used + required_mass;
+
+			// Update the blocking
+			blocking = instant;
 		}
-
-		// Get liquefied mass
-		liquefied_mass = calculate_liquefaction_mass_rdc(index, req_index, instant, task_vector, resp_time_hp);
-
-		// Get the next instant at which we calculate the liquefied mass
-		instant = (unsigned int)wavefront_length[i];
-
-		// Get the required mass of the set of bins
-		required_mass = (instant - prev_instant)*wavefront_bin_fraction[i];
-
-		// If liquefied mass is less than required mass
-		if (liquefied_mass < required_mass)
-		{
-
-		}
-		
 	}
 
-	// Estimate Blocking
-	blocking = 0; 
-	blocking_dash = 1;
+	// Estimate Blocking -> First initialize
+	init_blocking = blocking;
+	blocking_dash = blocking + 1;
+	// Perform recurrence until convergence
 	while (blocking != blocking_dash)
 	{
 		blocking_dash = blocking;
-		blocking = Hl_max;
-		
+		liquefied_mass = calculate_liquefaction_mass_rdc(index, req_index, (unsigned int) blocking, 
+														 task_vector, resp_time_hp);
+						    
+		// Is the wavefront liquefaction flag set
+		if (wavefront_liquefaction)
+		{
+			liquefied_mass = liquefied_mass + wavefront_liquefaction_mass; // add the wavefront mass
+		}
+		else 
+		{
+			 liquefied_mass = liquefied_mass - liquefied_mass_used; // subtract the mass used to fill the bins at the wavefront
+		}
+		blocking = init_blocking + floor(liquefied_mass/blocking_fraction);
+				
 	}
 	return blocking;
 }
@@ -268,10 +324,14 @@ std::vector<double> calculate_hp_resp_time_rdc(unsigned int index, const std::ve
 /**************** Calculate Schedulability using the Request-Driven Approach ********************/ 
 int check_schedulability_request_driven_conc(std::vector<Task> &task_vector, 
 										std::vector<double> &resp_time, 
-										std::vector<std::vector<double>> &req_blocking)
+										std::vector<std::vector<double>> &req_blocking, 
+										bool simple_flag)
 {
 	// Pre-compute the response-time of each GPU segment
 	pre_compute_gpu_response_time(task_vector);
+
+	// Set the global wavefront liquefaction flag
+	wavefront_liquefaction = simple_flag;
 
 	// Clear the direct blocking vector of vectors
 	req_blocking.clear();

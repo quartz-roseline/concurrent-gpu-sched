@@ -308,7 +308,7 @@ double find_next_max_lp_gpu_wcrt_segment(int index, double value, int &lp_index,
            task_vector : vector of tasks 
    Returns: length of the max WCRT low-priority task GPU segment */
 double find_next_max_lp_gpu_wcrt_segment_frac(int index, double value, int num_biggest, double &req_fraction, 
-											  double fraction, const std::vector<Task> &task_vector);
+											  double fraction, const std::vector<Task> &task_vector)
 {
 	int H_max_index = index + 1;
 	double H_max = 0;

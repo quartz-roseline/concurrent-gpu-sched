@@ -1,6 +1,6 @@
 /*
- * @file request-driven-test-conc.hpp
- * @brief Header of the request-driven schedulability test for concurrent GPUs
+ * @file job-driven-test.hpp
+ * @brief Header of the job-driven schedulability test for concurrent GPUs
  * @author Sandeep D'souza 
  * 
  * Copyright (c) Carnegie Mellon University, 2019. All rights reserved.
@@ -25,8 +25,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef REQUEST_DRIVEN_CONC_HPP
-#define REQUEST_DRIVEN_CONC_HPP
+#ifndef JOB_DRIVEN_CONC_HPP
+#define JOB_DRIVEN_CONC_HPP
 
 #define DEBUG 0
 
@@ -34,15 +34,10 @@
 
 #include "task.hpp"
 
-/**************** Calculate Schedulability using the Request-Driven Approach ********************/ 
+/**************** Calculate Schedulability using the Job-Driven Approach ********************/ 
 /* Params: task_vector: vector of tasks 
 		   resp_time: vector of response times of each task (is populated on the return)
-		   req_blocking: vector of vectors of per-request direct blocking faced (populated by the function)
-		   simple_flag: true indicates perform the simple schedulability test
    Returns: 0 if schedulable */
-int check_schedulability_request_driven_conc(std::vector<Task> &task_vector, 
-										std::vector<double> &resp_time,
-										std::vector<std::vector<double>> &req_blocking,
-										bool simple_flag);
+int check_schedulability_job_driven_conc(std::vector<Task> &task_vector, std::vector<double> &resp_time);
 
 #endif

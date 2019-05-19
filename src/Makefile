@@ -1,6 +1,6 @@
 #------------------------------------------------------------------------------
 
-UNIPROC_OBJ=uniprocessor_exp.o task.o taskset.o taskset-gen.o request-driven-test.o job-driven-test.o hybrid-test.o indirect-cis.o config.hpp
+UNIPROC_OBJ=uniprocessor_exp.o task.o taskset.o taskset-gen.o request-driven-test.o job-driven-test.o hybrid-test.o request-driven-test-conc.o job-driven-test-conc.o indirect-cis.o config.hpp
 #MCPROC_OBJ=mcprocessor_exp.o task_partitioning.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-cpu-mc.o cycle-solo-accel-mc.o cycle-solo-id-mc.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
 #MCPROC_SCHED_OBJ=mcprocessor_sched_exp.o task_partitioning.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-cpu-mc.o cycle-solo-accel-mc.o cycle-solo-id-mc.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
 #PAPEREX_OBJ=paper_examples.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-id.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
@@ -35,6 +35,12 @@ hyperperiod.o: hyperperiod.cpp hyperperiod.hpp config.hpp
 
 indirect-cis.o: indirect-cis.cpp indirect-cis.hpp config.hpp
 	$(CC) -c indirect-cis.cpp -o indirect-cis.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
+
+request-driven-test-conc.o: request-driven-test-conc.cpp request-driven-test-conc.hpp config.hpp
+	$(CC) -c request-driven-test-conc.cpp -o request-driven-test-conc.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
+
+job-driven-test-conc.o: job-driven-test-conc.cpp job-driven-test-conc.hpp config.hpp
+	$(CC) -c job-driven-test-conc.cpp -o job-driven-test-conc.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
 # task_partitioning.o: task_partitioning.cpp task_partitioning.hpp config.hpp
 # 	$(CC) -c task_partitioning.cpp -o task_partitioning.o -l$(MYLIBRARIES) $(CFLAGS_NEW)

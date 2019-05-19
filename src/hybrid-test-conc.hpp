@@ -1,6 +1,6 @@
 /*
- * @file job-driven-test.hpp
- * @brief Header of the job-driven schedulability test for concurrent GPUs
+ * @file hybrid-test-conc.hpp
+ * @brief Header of the hybrid schedulability test for concurrent GPUs
  * @author Sandeep D'souza 
  * 
  * Copyright (c) Carnegie Mellon University, 2019. All rights reserved.
@@ -25,8 +25,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef JOB_DRIVEN_CONC_HPP
-#define JOB_DRIVEN_CONC_HPP
+#ifndef HYBRID_CONC_HPP
+#define HYBRID_CONC_HPP
 
 #define DEBUG 0
 
@@ -34,13 +34,18 @@
 
 #include "task.hpp"
 
-/**************** Calculate Schedulability using the Job-Driven Approach ********************/ 
-/* Params: task_vector: vector of tasks 
-		   resp_time: vector of response times of each task (is populated on the return)
-		   direct_blocking: vector of direct blocking faced by task (is populated on the return)
-		   ro_job_flag: true implies we use the request-oriented job-driven approach
+/**************** Calculate Schedulability using the Hybrid Approach ********************/ 
+/* Params:  task_vector: vector of tasks 
+		    resp_time_rd: vector of response times of each task (using the request-driven approach)
+		    resp_time_jd: vector of response times of each task (using the job-driven approach)
+		    req_blocking: direct blocking faced by individual requests (using the request-driven approach)
+		    job_blocking: direct blocking faced by individual requests (using the job-driven approach)
    Returns: 0 if schedulable */
-int check_schedulability_job_driven_conc(std::vector<Task> &task_vector, std::vector<double> &resp_time,
-										 std::vector<double> &direct_blocking, bool ro_job_flag);
+int check_schedulability_hybrid_conc(std::vector<Task> &task_vector, 
+								const std::vector<double> &resp_time_rd,
+								const std::vector<double> &resp_time_jd,
+								const std::vector<std::vector<double>> &req_blocking,
+								const std::vector<double> &job_blocking);
+
 
 #endif

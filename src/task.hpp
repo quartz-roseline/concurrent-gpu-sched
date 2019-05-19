@@ -71,6 +71,9 @@ class Task
 	// Get the maximum task GPU fractional requirement
 	public: double getMaxF() const;
 
+	// Get the maximum task GPU fractional requirement after index
+	public: double getIndexMaxF(unsigned int index, unsigned int &max_index) const;
+
 	// Get the total CPU time required by the task in the period
 	public: double getE() const;
 

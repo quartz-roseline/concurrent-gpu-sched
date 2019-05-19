@@ -149,6 +149,23 @@ double Task::getMaxF() const
 	return maxF;
 }
 
+double Task::getIndexMaxF(unsigned int index, unsigned int &max_index) const
+{
+	double maxF = 0;
+	if (num_gpu_segments > 0 && index < num_gpu_segments)
+	{
+		for (int i = index; i < num_gpu_segments; i++)
+		{
+			if (getF(i) > maxF)
+			{
+				maxF = getF(i);
+				max_index = i;
+			}
+		}
+	}
+	return maxF;
+}
+
 double Task::getH(unsigned int i) const
 {
 	if (i >= num_gpu_segments)

@@ -1,6 +1,6 @@
 #------------------------------------------------------------------------------
 
-UNIPROC_OBJ=uniprocessor_exp.o task.o taskset.o taskset-gen.o request-driven-test.o job-driven-test.o hybrid-test.o request-driven-test-conc.o job-driven-test-conc.o indirect-cis.o config.hpp
+UNIPROC_OBJ=uniprocessor_exp.o task.o taskset.o taskset-gen.o request-driven-test.o job-driven-test.o hybrid-test.o request-driven-test-conc.o job-driven-test-conc.o hybrid-test-conc.o indirect-cis.o config.hpp
 #MCPROC_OBJ=mcprocessor_exp.o task_partitioning.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-cpu-mc.o cycle-solo-accel-mc.o cycle-solo-id-mc.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
 #MCPROC_SCHED_OBJ=mcprocessor_sched_exp.o task_partitioning.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-cpu-mc.o cycle-solo-accel-mc.o cycle-solo-id-mc.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
 #PAPEREX_OBJ=paper_examples.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-id.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
@@ -42,6 +42,9 @@ request-driven-test-conc.o: request-driven-test-conc.cpp request-driven-test-con
 job-driven-test-conc.o: job-driven-test-conc.cpp job-driven-test-conc.hpp config.hpp
 	$(CC) -c job-driven-test-conc.cpp -o job-driven-test-conc.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
+hybrid-test-conc.o: hybrid-test-conc.cpp hybrid-test-conc.hpp config.hpp
+	$(CC) -c hybrid-test-conc.cpp -o hybrid-test-conc.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
+
 # task_partitioning.o: task_partitioning.cpp task_partitioning.hpp config.hpp
 # 	$(CC) -c task_partitioning.cpp -o task_partitioning.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
@@ -58,7 +61,7 @@ uniprocessor_exp.o: uniprocessor_exp.cpp config.hpp
 # 	$(CC) -c paper_examples.cpp -o paper_examples.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
 uniprocessor_exp: $(UNIPROC_OBJ)
-	$(CC) $(UNIPROC_OBJ) -o uniprocessor_exp -l$(MYLIBRARIES) $(CFLAGS_NEW)
+	$(CC) $(UNIPROC_OBJ) -o uniprocessor_exp.out -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
 # mcprocessor_exp: $(MCPROC_OBJ)
 # 	$(CC) $(MCPROC_OBJ) -o mcprocessor_exp -l$(MYLIBRARIES) $(CFLAGS_NEW)
@@ -70,5 +73,5 @@ uniprocessor_exp: $(UNIPROC_OBJ)
 # 	$(CC) $(PAPEREX_OBJ) -o paper_examples -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
 clean:
-	rm -f uniprocessor_exp paper_examples mcprocessor_exp mcprocessor_sched_exp *.o
+	rm -f uniprocessor_exp.out paper_examples.out mcprocessor_exp.out mcprocessor_sched_exp.out *.o
 

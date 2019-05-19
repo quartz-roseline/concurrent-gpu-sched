@@ -37,6 +37,9 @@
 #include "taskset.hpp"
 #include "config.hpp"
 
+// Request-Oriented flag
+bool request_oriented = false;
+
 /**************** Calculate Prioritized Blocking using the job-driven approach sub-routine ********************/ 
 double calculate_prioritized_blocking_jdc(unsigned int index, double response_time, const std::vector<Task> &task_vector)
 {
@@ -98,13 +101,88 @@ double calculate_liquefaction_mass_jdc(unsigned int index, double resp_time, con
 	return mass;
 }
 
+/**************** Calculate Per-job Request-Oriented Direct Blocking sub-routine ********************/ 
+double calculate_direct_blocking_rojdc(unsigned int index, const std::vector<Task> &task_vector, const std::vector<double> &resp_time_hp, double resp_time)
+{
+	double blocking = 0;
+	double blocking_dash;
+	double lp_blocking = 0;
+	unsigned int num_gpu_segments = task_vector[index].getNumGPUSegments();
+	double fraction = task_vector[index].getMaxF();
+	double blocking_fraction;
+	double left_over_fraction;
+	double wavefront_req_fraction = 0;
+	double liquefied_mass = 0 ;
+	double wavefront_liquefaction_mass = 0;
+	int num_biggest = 0;
+	unsigned int max_index;
+
+	double Hl_max = MAX_PERIOD+1; // Set to a large number (MAX_PERIOD is biggest possible)
+
+	// Return 0 blocking if task has no GPU execution
+	if(task_vector[index].getTotalGe() == 0)
+		return 0;
+
+	// Get the index of the biggest gpu fraction of this task
+	task_vector[index].getIndexMaxF(0, max_index);
+
+	for (unsigned int req_ind = 0; req_ind < num_gpu_segments; req_ind++)
+	{
+		// Get this task fraction
+		fraction = task_vector[index].getF(req_ind);
+		blocking_fraction = 1 - fraction + (1.0/double(GPU_FRACTION_GRANULARITY));
+		left_over_fraction = blocking_fraction;
+
+		Hl_max = MAX_PERIOD+1; // Set to a large number (MAX_PERIOD is biggest possible)
+		num_biggest = 0;
+		wavefront_liquefaction_mass = 0;
+		wavefront_req_fraction = 0;
+
+		// Get the wavefront pattern
+		while (left_over_fraction > 0 && Hl_max > 0)
+		{
+			num_biggest++;
+			Hl_max = find_next_max_lp_gpu_wcrt_segment_frac(index, Hl_max, num_biggest, wavefront_req_fraction, 
+												  			fraction, task_vector);
+			// Update the leftover fraction to fill
+			left_over_fraction = left_over_fraction - wavefront_req_fraction;
+
+			// add an optimization for the request bigger than the blocking fraction (if we use wavefront liquefaction)
+			if (wavefront_req_fraction > blocking_fraction)
+				wavefront_req_fraction = blocking_fraction;
+
+			wavefront_liquefaction_mass = wavefront_liquefaction_mass + Hl_max*wavefront_req_fraction;
+		}
+
+		if (req_ind < max_index)
+		{
+			// Set the liquefaction mass as the low-prio blocking using liquefaction for this request
+			liquefied_mass = wavefront_liquefaction_mass;
+		}
+		else
+		{
+			// Get the Liquefaction Mass
+			liquefied_mass = wavefront_liquefaction_mass + calculate_liquefaction_mass_jdc(index, resp_time, 
+														 	task_vector, resp_time_hp);
+
+			// Get the next index of the biggest gpu fraction of this task
+			task_vector[index].getIndexMaxF(req_ind+1, max_index);
+		}
+		
+		// Compute the blocking estimate	
+		blocking = blocking + floor(liquefied_mass/blocking_fraction);
+	}
+	
+	return blocking;
+}
+
 /**************** Calculate Per-job Direct Blocking sub-routine ********************/ 
 double calculate_direct_blocking_jdc(unsigned int index, const std::vector<Task> &task_vector, const std::vector<double> &resp_time_hp, double resp_time)
 {
 	double blocking = 0;
 	double blocking_dash;
 	double init_blocking = 0;
-	unsigned int num_gpu_segments;
+	unsigned int num_gpu_segments = task_vector[index].getNumGPUSegments();
 	double fraction = task_vector[index].getMaxF();
 	double blocking_fraction = 1 - fraction + (1.0/double(GPU_FRACTION_GRANULARITY));
 	double left_over_fraction = blocking_fraction;
@@ -139,7 +217,7 @@ double calculate_direct_blocking_jdc(unsigned int index, const std::vector<Task>
 	liquefied_mass = calculate_liquefaction_mass_jdc(index, resp_time, 
 													 task_vector, resp_time_hp);
 	// Add the wavefront mass	
-	liquefied_mass = liquefied_mass + wavefront_liquefaction_mass; 
+	liquefied_mass = liquefied_mass + num_gpu_segments*wavefront_liquefaction_mass; 
 	
 	// Compute the blocking estimate	
 	blocking = init_blocking + floor(liquefied_mass/blocking_fraction);
@@ -148,9 +226,10 @@ double calculate_direct_blocking_jdc(unsigned int index, const std::vector<Task>
 }
 
 /**************** Calculate Total Blocking sub-routine ********************/ 
-double calculate_blocking_jdc(unsigned int index, const std::vector<Task> &task_vector, const std::vector<double> &resp_time_hp, double resp_time)
+double calculate_blocking_jdc(unsigned int index, const std::vector<Task> &task_vector, const std::vector<double> &resp_time_hp, double resp_time, std::vector<double> &direct_blocking)
 {
 	double blocking = 0;
+	double direct_blocking_local = 0;
 	unsigned int num_gpu_segments = task_vector[index].getNumGPUSegments();
 
 	// Add the prioritized blocking using the job-driven approach
@@ -160,7 +239,13 @@ double calculate_blocking_jdc(unsigned int index, const std::vector<Task> &task_
 		return blocking;
 
 	// Get the direct blocking
-	blocking = blocking + calculate_direct_blocking_jdc(index, task_vector, resp_time_hp, resp_time);
+	if (request_oriented) // Use the Request-Oriented Job-Driven approach
+		direct_blocking_local = calculate_direct_blocking_rojdc(index, task_vector, resp_time_hp, resp_time);
+	else // Use the regular job-oriented approach
+		direct_blocking_local = calculate_direct_blocking_jdc(index, task_vector, resp_time_hp, resp_time);
+	
+	direct_blocking[index] = direct_blocking_local;
+	blocking = blocking + direct_blocking_local;
 
 	return blocking;
 }
@@ -185,7 +270,7 @@ double calculate_interference_jdc(unsigned int index, const std::vector<Task> &t
 }
 
 /**************** The Calculate High-Priority response time sub-routine using the job-driven approach ********************/ 
-std::vector<double> calculate_hp_resp_time_jdc(unsigned int index, const std::vector<Task> &task_vector)
+std::vector<double> calculate_hp_resp_time_jdc(unsigned int index, const std::vector<Task> &task_vector, std::vector<double> &direct_blocking)
 {
 	double blocking, interference;
 	double resp_time, resp_time_dash, init_resp_time;
@@ -202,7 +287,7 @@ std::vector<double> calculate_hp_resp_time_jdc(unsigned int index, const std::ve
 		{
 			resp_time = resp_time_dash;
 			// Get the blocking
-			blocking = calculate_blocking_jdc(i, task_vector, resp_time_hp, resp_time);
+			blocking = calculate_blocking_jdc(i, task_vector, resp_time_hp, resp_time, direct_blocking);
 			interference = calculate_interference_jdc(i, task_vector, resp_time_hp, resp_time);
 			resp_time_dash = init_resp_time + blocking + interference;
 		}
@@ -213,13 +298,21 @@ std::vector<double> calculate_hp_resp_time_jdc(unsigned int index, const std::ve
 }
 
 /**************** Calculate Schedulability using the Job-Driven Approach ********************/ 
-int check_schedulability_job_driven_conc(std::vector<Task> &task_vector, std::vector<double> &resp_time)
+int check_schedulability_job_driven_conc(std::vector<Task> &task_vector, std::vector<double> &resp_time,
+										 std::vector<double> &direct_blocking, bool ro_job_flag)
 {
 	// Pre-compute the response-time of each GPU segment
 	pre_compute_gpu_response_time(task_vector);
 
+	// Set the direct blocking vector
+	direct_blocking.clear();
+	direct_blocking.reserve(task_vector.size());
+
+	// Set the request-oriented flag
+	request_oriented = ro_job_flag;
+
 	// Do the schedulability test
-	resp_time = calculate_hp_resp_time_jdc(task_vector.size(), task_vector);
+	resp_time = calculate_hp_resp_time_jdc(task_vector.size(), task_vector, direct_blocking);
 
 	for (unsigned int index = 0; index < task_vector.size(); index++) 
 	{

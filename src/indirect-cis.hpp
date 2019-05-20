@@ -28,8 +28,6 @@
 #ifndef INDIRECT_CIS_HPP
 #define INDIRECT_CIS_HPP
 
-#define DEBUG 0
-
 #include <vector>
 
 #include "task.hpp"

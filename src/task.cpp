@@ -38,7 +38,7 @@ Task::Task(task_t task_params)
 	cpu_freq = 1.0;
 	gpu_freq = 1.0;
 	core_id = 0;
-	gpu_seg_response_time.reserve(num_gpu_segments);
+	gpu_seg_response_time.resize(num_gpu_segments, 0);
 }
 
 // Destructor
@@ -178,7 +178,6 @@ int Task::setH(unsigned int i, double H)
 {
 	if (i >= num_gpu_segments)
 		return -1;
-
 	gpu_seg_response_time[i] = H;
 	return 0;
 }

@@ -175,6 +175,9 @@ int check_schedulability_job_driven(std::vector<Task> &task_vector, std::vector<
 	// Pre-compute the response-time of each GPU segment
 	pre_compute_gpu_response_time(task_vector);
 
+	if (DEBUG)
+		printf("Job-Driven Approach\n");
+
 	// Do the schedulability test
 	resp_time = calculate_hp_resp_time_jd(task_vector.size(), task_vector);
 

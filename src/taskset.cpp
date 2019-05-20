@@ -148,7 +148,7 @@ int find_max_lp_gpu_index(int index, const std::vector<Task> &task_vector)
 	int num_gpu_segments;
 	for (unsigned int i = index + 1; i < task_vector.size(); i++)
 	{
-		num_gpu_segments = task_vector[index].getNumGPUSegments();
+		num_gpu_segments = task_vector[i].getNumGPUSegments();
 		if (num_gpu_segments != 0)
 		{
 			for (unsigned int j = 0; j < num_gpu_segments; j++)
@@ -177,7 +177,7 @@ double find_max_lp_gpu_segment(int index, const std::vector<Task> &task_vector)
 	int num_gpu_segments;
 	for (unsigned int i = index + 1; i < task_vector.size(); i++)
 	{
-		num_gpu_segments = task_vector[index].getNumGPUSegments();
+		num_gpu_segments = task_vector[i].getNumGPUSegments();
 		if (num_gpu_segments != 0)
 		{
 			for (unsigned int j = 0; j < num_gpu_segments; j++)
@@ -206,7 +206,7 @@ int find_max_lp_gpu_wcrt_index(int index, const std::vector<Task> &task_vector)
 	int num_gpu_segments;
 	for (unsigned int i = index + 1; i < task_vector.size(); i++)
 	{
-		num_gpu_segments = task_vector[index].getNumGPUSegments();
+		num_gpu_segments = task_vector[i].getNumGPUSegments();
 		if (num_gpu_segments != 0)
 		{
 			for (unsigned int j = 0; j < num_gpu_segments; j++)
@@ -235,7 +235,7 @@ double find_max_lp_gpu_wcrt_segment(int index, const std::vector<Task> &task_vec
 	int num_gpu_segments;
 	for (unsigned int i = index + 1; i < task_vector.size(); i++)
 	{
-		num_gpu_segments = task_vector[index].getNumGPUSegments();
+		num_gpu_segments = task_vector[i].getNumGPUSegments();
 		if (num_gpu_segments != 0)
 		{
 			for (unsigned int j = 0; j < num_gpu_segments; j++)
@@ -268,7 +268,7 @@ double find_next_max_lp_gpu_wcrt_segment(int index, double value, int &lp_index,
 	int counter = 0;
 	for (unsigned int i = index + 1; i < task_vector.size(); i++)
 	{
-		num_gpu_segments = task_vector[index].getNumGPUSegments();
+		num_gpu_segments = task_vector[i].getNumGPUSegments();
 		if (num_gpu_segments != 0)
 		{
 			for (unsigned int j = 0; j < num_gpu_segments; j++)
@@ -322,7 +322,7 @@ double find_next_max_lp_gpu_wcrt_segment_frac(int index, double value, int num_b
 	// Find the largest request meeting the criteria
 	for (unsigned int i = index + 1; i < task_vector.size(); i++)
 	{
-		num_gpu_segments = task_vector[index].getNumGPUSegments();
+		num_gpu_segments = task_vector[i].getNumGPUSegments();
 		if (num_gpu_segments != 0)
 		{
 			for (unsigned int j = 0; j < num_gpu_segments; j++)
@@ -358,7 +358,7 @@ double find_next_max_lp_gpu_wcrt_segment_frac(int index, double value, int num_b
 	return H_max;
 }
 
-/* Find the kth largest cpu internvention of a lp task which is smaller (<=) than value */
+/* Find the kth largest cpu intervention of a lp task which is smaller (<=) than value */
 /* Params: index      : task index in vector ordered by priority which we need to search
 		   value      : value which wcrt should be less than or equal to
 		   num_biggest: the kth largest element to find (starting at 1st)

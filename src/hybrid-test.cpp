@@ -42,7 +42,7 @@ double calculate_prioritized_blocking_hybrid(unsigned int index, double response
 {
 	double blocking = 0;
 	unsigned int theta = 0;
-	int num_biggest = 0;
+	int num_biggest = 1;
 	double phi, phi_sum, Gm_max;
 	unsigned int num_gpu_segments = task_vector[index].getNumGPUSegments();
 	unsigned int coreID = task_vector[index].getCoreID();
@@ -56,7 +56,7 @@ double calculate_prioritized_blocking_hybrid(unsigned int index, double response
 		else
 			theta = getTheta(task_vector[i], response_time);
 
-		// Calculate the prioritzed blocking due to this lp task
+		// Calculate the prioritized blocking due to this lp task
 		phi = 0;
 		phi_sum = 0;
 		Gm_max = find_next_task_max_gpu_intervention_segment(i, double(MAX_PERIOD+1), num_biggest, task_vector);
@@ -66,6 +66,9 @@ double calculate_prioritized_blocking_hybrid(unsigned int index, double response
 				phi = theta;
 			else
 				phi = num_gpu_segments + 1 - phi_sum;
+
+			// Add to the phi sum
+			phi_sum = phi_sum + phi;
 
 			// Add to the blocking
 			blocking = blocking + phi*Gm_max;
@@ -262,6 +265,9 @@ int check_schedulability_hybrid(std::vector<Task> &task_vector,
 {
 	//l Pre-compute the response-time of each GPU segment
 	pre_compute_gpu_response_time(task_vector);
+
+	if (DEBUG)
+		printf("Hybrid Approach\n");
 
 	// Do the schedulability test
 	std::vector<double> resp_time = calculate_hp_resp_time_hybrid(task_vector.size(), task_vector,

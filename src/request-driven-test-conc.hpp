@@ -28,7 +28,7 @@
 #ifndef REQUEST_DRIVEN_CONC_HPP
 #define REQUEST_DRIVEN_CONC_HPP
 
-#define DEBUG 0
+#define DEBUG 1
 
 #include <vector>
 

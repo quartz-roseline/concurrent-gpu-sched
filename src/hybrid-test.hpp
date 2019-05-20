@@ -28,7 +28,7 @@
 #ifndef HYBRID_HPP
 #define HYBRID_HPP
 
-#define DEBUG 0
+#define DEBUG 1
 
 #include <vector>
 

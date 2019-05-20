@@ -4,7 +4,7 @@ UNIPROC_OBJ=uniprocessor_exp.o task.o taskset.o taskset-gen.o request-driven-tes
 #MCPROC_OBJ=mcprocessor_exp.o task_partitioning.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-cpu-mc.o cycle-solo-accel-mc.o cycle-solo-id-mc.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
 #MCPROC_SCHED_OBJ=mcprocessor_sched_exp.o task_partitioning.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-cpu-mc.o cycle-solo-accel-mc.o cycle-solo-id-mc.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
 #PAPEREX_OBJ=paper_examples.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-id.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
-CFLAGS_NEW=-std=c++0x
+CFLAGS_NEW=-std=c++0x -g3
 MYLIBRARIES=m
 CC=g++
 

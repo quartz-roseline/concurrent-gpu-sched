@@ -28,7 +28,7 @@
 #ifndef JOB_DRIVEN_CONC_HPP
 #define JOB_DRIVEN_CONC_HPP
 
-#define DEBUG 0
+#define DEBUG 1
 
 #include <vector>
 

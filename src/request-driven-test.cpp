@@ -105,11 +105,11 @@ double calculate_request_direct_blocking_rd(unsigned int index, unsigned int req
 			num_gpu_segments = task_vector[i].getNumGPUSegments();
 			if (task_vector[i].getTotalGe() != 0)
 			{
+				beta = ceil((blocking_dash + resp_time_hp[i] - ((task_vector[i].getC()+task_vector[i].getTotalGm())))/task_vector[i].getT());
 				for (unsigned int req_ind = 0; req_ind < num_gpu_segments; req_ind++)
 				{
 					if (task_vector[i].getGe(req_ind) != 0)
 					{
-						beta = ceil((blocking_dash + resp_time_hp[i] - ((task_vector[i].getC()+task_vector[i].getTotalGm())))/task_vector[i].getT());
 						blocking = blocking + beta*(task_vector[i].getH(req_ind));
 					}
 				}
@@ -226,6 +226,9 @@ int check_schedulability_request_driven(std::vector<Task> &task_vector,
 
 	// Clear the direct blocking vector of vectors
 	req_blocking.clear();
+
+	if (DEBUG)
+		printf("Request-Driven Approach\n");
 
 	// Do the schedulability test
 	resp_time = calculate_hp_resp_time_rd(task_vector.size(), task_vector, req_blocking);

@@ -39,8 +39,15 @@
 #include "task.hpp"
 #include "taskset.hpp"
 #include "taskset-gen.hpp"
-#include "request-driven-test.hpp"
 #include "config.hpp"
+
+/* Schedulability test headers */
+#include "request-driven-test.hpp"
+#include "job-driven-test.hpp"
+#include "hybrid-test.hpp"
+#include "request-driven-test-conc.hpp"
+#include "job-driven-test-conc.hpp"
+#include "hybrid-test-conc.hpp"
 
 // Comparator class for ordering tasks using RMS
 struct CompareTaskPriorityRMS {
@@ -58,9 +65,27 @@ int main(int argc, char **argv)
 	int number_tasks;
 	int retval;
 	int number_gpu_tasks;
-	int sched_flag = 0;
-	int post_sched_flag = 0;
 	int taskset_counter = 0;
+
+	// Schedulability Flags
+	int sched_flag_rd = 0;
+	int sched_flag_jd = 0;
+	int sched_flag_hybrid = 0;
+	int sched_flag_rd_conc = 0;
+	int sched_flag_rd_conc_simple = 0;
+	int sched_flag_jd_conc = 0;
+	int sched_flag_jd_conc_ro = 0;
+	int sched_flag_hybrid_conc = 0;
+
+	// Schedulability Counters
+	int counter_rd = 0;
+	int counter_jd = 0;
+	int counter_hybrid = 0;
+	int counter_rd_conc = 0;
+	int counter_rd_conc_simple = 0;
+	int counter_jd_conc = 0;
+	int counter_jd_conc_ro = 0;
+	int counter_hybrid_conc = 0;
 
 	// Average Util counters
 	double average_cpu_util = 0, average_gpu_util = 0;
@@ -68,9 +93,6 @@ int main(int argc, char **argv)
 	// Output Filestream
 	std::ofstream outfile;
 	int file_flag = 0;
-
-	// Number of GPU segments
-	int number_gpu_segments = MAX_GPU_SEGMENTS;
 
 	// Number of tasksets to simulate
 	int taskset_count = 1;
@@ -114,9 +136,20 @@ int main(int argc, char **argv)
 		fraction_sweep_mode = 1;
 	}
 
+	// Max Number of GPU segments
+	int number_gpu_segments = MAX_GPU_SEGMENTS;
+	if (argc > 8)
+	{
+		number_gpu_segments = std::atoi(argv[8]);
+	}
+
 	// Request-Driven Vectors
 	std::vector<double> resp_time_rd;
 	std::vector<std::vector<double>> req_blocking_rd;
+
+	// Job-Driven Vectors
+	std::vector<double> resp_time_jd;
+	std::vector<double> job_blocking_jd;
 
 	/* initialize random seed: */
   	srand (time(NULL));
@@ -144,35 +177,111 @@ int main(int argc, char **argv)
 		// Sort Vector based on Some Priority ordering (here RMS)
 		std::sort(task_vector.begin(), task_vector.end(), ComparePriorityRMS);
 
-		// Check Schedulability
-		sched_flag = check_schedulability_request_driven(task_vector, resp_time_rd, req_blocking_rd);
+		print_taskset(task_vector);
 
-		// If taskset is schedulable then compute frequency
-		if (sched_flag == 0)
-		{
-			// Compute utilization values for energy calculations
-			true_cpu_util = get_taskset_cpu_util(task_vector);
-			true_gpu_util = get_taskset_gpu_util(task_vector);
+		// Check Schedulability -> Non-concurrent approaches
+		resp_time_jd.clear();
+		req_blocking_rd.clear();
+		resp_time_jd.clear();
+		sched_flag_rd = check_schedulability_request_driven(task_vector, resp_time_rd, req_blocking_rd);
+		sched_flag_jd = check_schedulability_job_driven(task_vector, resp_time_jd);
+		sched_flag_hybrid = check_schedulability_hybrid(task_vector, resp_time_rd, resp_time_jd, req_blocking_rd);
+		
+		// Check Schedulability -> Concurrent approaches (simple)
+		resp_time_jd.clear();
+		req_blocking_rd.clear();
+		resp_time_jd.clear();
+		job_blocking_jd.clear();
+		sched_flag_rd_conc_simple = check_schedulability_request_driven_conc(task_vector, resp_time_rd, req_blocking_rd, true);
+		sched_flag_jd_conc = check_schedulability_job_driven_conc(task_vector, resp_time_jd, job_blocking_jd, false);
+		
+		// Check Schedulability -> Concurrent approaches (complex)
+		resp_time_jd.clear();
+		req_blocking_rd.clear();
+		resp_time_jd.clear();
+		job_blocking_jd.clear();
+		sched_flag_rd_conc = check_schedulability_request_driven_conc(task_vector, resp_time_rd, req_blocking_rd, false);
+		sched_flag_jd_conc_ro = check_schedulability_job_driven_conc(task_vector, resp_time_jd, job_blocking_jd, true);
+		sched_flag_hybrid_conc = check_schedulability_hybrid_conc(task_vector, resp_time_rd, resp_time_jd, req_blocking_rd, job_blocking_jd);
 
-			// Update average utilization values
-			average_gpu_util = average_gpu_util + true_gpu_util;
-			average_cpu_util = average_cpu_util + true_cpu_util;
-			taskset_counter++;
-		}
+		std::cout << "Schedulability:" << "\n";
+		std::cout << "Request-Driven        : " << sched_flag_rd << "\n";
+		std::cout << "Job-Driven            : " << sched_flag_jd << "\n";
+		std::cout << "Hybrid                : " << sched_flag_hybrid << "\n";
+		std::cout << "Request-Driven-Conc-S : " << sched_flag_rd_conc_simple << "\n";
+		std::cout << "Job-Driven-Conc       : " << sched_flag_jd_conc << "\n";
+		std::cout << "Request-Driven-Conc   : " << sched_flag_rd_conc << "\n";
+		std::cout << "Job-Driven-Conc-RO    : " << sched_flag_jd_conc_ro << "\n";
+		std::cout << "Hybrid-Conc           : " << sched_flag_hybrid_conc << "\n";
+		// std::cin.get();
+
+		// Update the schedulability counters
+		if (sched_flag_rd == 0)
+			counter_rd++;
+
+		if (sched_flag_jd == 0)
+			counter_jd++;
+
+		if (sched_flag_hybrid == 0)
+			counter_hybrid++;
+
+		if (sched_flag_rd_conc == 0)
+			counter_rd_conc++;
+
+		if (sched_flag_jd_conc == 0)
+			counter_jd_conc++;
+
+		if (sched_flag_rd_conc_simple == 0)
+			counter_rd_conc_simple++;
+
+		if (sched_flag_jd_conc_ro == 0)
+			counter_jd_conc_ro++;
+
+		if (sched_flag_hybrid_conc == 0)
+			counter_hybrid_conc++;
+		
+		// Compute utilization values for energy calculations
+		true_cpu_util = get_taskset_cpu_util(task_vector);
+		true_gpu_util = get_taskset_gpu_util(task_vector);
+
+		// Update average utilization values
+		average_gpu_util = average_gpu_util + true_gpu_util;
+		average_cpu_util = average_cpu_util + true_cpu_util;
+		taskset_counter++;
 	}
 
+	// Compute the Average
+	average_gpu_util = average_gpu_util/taskset_count;
+	average_cpu_util = average_cpu_util/taskset_count;
 
 	// Write values to file
 	if (file_flag == 1)
-	{
-		if (fraction_sweep_mode == 1)
-		{
-			outfile << average_cpu_util << ","
-			        << average_gpu_util << ",";
-		}
-
+	{	
+		outfile << average_cpu_util << ","
+		        << average_gpu_util << ","
+		        << taskset_count << ","
+		        << counter_rd << ","
+		        << counter_jd << ","
+		        << counter_hybrid << ","
+		        << counter_rd_conc << ","
+		        << counter_jd_conc << ","
+		        << counter_rd_conc_simple << ","
+		        << counter_jd_conc_ro << ","
+		        << counter_hybrid_conc;
 		outfile.close();
 	}
+
+	std::cout << "Tasksets: " << taskset_count << "\n";
+	std::cout << "Avg. CPU Util :" << average_cpu_util << "\n";
+	std::cout << "Avg. GPU Util :" << average_gpu_util << "\n";
+	std::cout << "Request-Driven        : " << counter_rd << "\n";
+	std::cout << "Job-Driven            : " << counter_jd << "\n";
+	std::cout << "Hybrid                : " << counter_hybrid << "\n";
+	std::cout << "Request-Driven-Conc-S : " << counter_rd_conc_simple << "\n";
+	std::cout << "Job-Driven-Conc       : " << counter_jd_conc << "\n";
+	std::cout << "Request-Driven-Conc   : " << counter_rd_conc << "\n";
+	std::cout << "Job-Driven-Conc-RO    : " << counter_jd_conc_ro << "\n";
+	std::cout << "Hybrid-Conc           : " << counter_hybrid_conc << "\n";
 
 	return 0;
 }

@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 	int sched_flag_hybrid_conc = 0;
 	int sched_flag_fifo_conc = 0;
 
-	// Schedulability Counters
+	// Schedulability Counters -> WFD
 	int counter_rd = 0;
 	int counter_jd = 0;
 	int counter_hybrid = 0;
@@ -81,6 +81,17 @@ int main(int argc, char **argv)
 	int counter_jd_conc_ro = 0;
 	int counter_hybrid_conc = 0;
 	int counter_fifo_conc = 0;
+
+	// Schedulability Counters -> SA-WFD
+	int sa_counter_rd = 0;
+	int sa_counter_jd = 0;
+	int sa_counter_hybrid = 0;
+	int sa_counter_rd_conc = 0;
+	int sa_counter_rd_conc_simple = 0;
+	int sa_counter_jd_conc = 0;
+	int sa_counter_jd_conc_ro = 0;
+	int sa_counter_hybrid_conc = 0;
+	int sa_counter_fifo_conc = 0;
 
 	// Average Util counters
 	double average_cpu_util = 0, average_gpu_util = 0;
@@ -226,81 +237,161 @@ int main(int argc, char **argv)
 
 		print_taskset(task_vector);
 
-		// Check Schedulability -> Non-concurrent approaches
-		resp_time_rd.clear();
-		req_blocking_rd.clear();
-		resp_time_jd.clear();
-		sched_flag_rd = worst_fit_decreasing(task_vector, num_cores, REQUEST_DRIVEN, resp_time_rd, resp_time_jd, 
-											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
-		sched_flag_jd = worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN, resp_time_rd, resp_time_jd, 
-											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
-		sched_flag_hybrid = worst_fit_decreasing(task_vector, num_cores, HYBRID, resp_time_rd, resp_time_jd, 
-											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+		// Check Schedulability -> Using WFD as task partitioning
+		{
+			// Check Schedulability -> Non-concurrent approaches
+			resp_time_rd.clear();
+			req_blocking_rd.clear();
+			resp_time_jd.clear();
+			sched_flag_rd = worst_fit_decreasing(task_vector, num_cores, REQUEST_DRIVEN, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_jd = worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_hybrid = worst_fit_decreasing(task_vector, num_cores, HYBRID, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			
+			// Check Schedulability -> Concurrent approaches (simple)
+			resp_time_rd.clear();
+			req_blocking_rd.clear();
+			resp_time_jd.clear();
+			job_blocking_jd.clear();
+			sched_flag_rd_conc_simple = worst_fit_decreasing(task_vector, num_cores, REQUEST_DRIVEN_CONC_SIMPLE, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_jd_conc = worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN_CONC, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			
+			// Check Schedulability -> Concurrent approaches (complex)
+			resp_time_rd.clear();
+			req_blocking_rd.clear();
+			resp_time_jd.clear();
+			job_blocking_jd.clear();
+			sched_flag_rd_conc = worst_fit_decreasing(task_vector, num_cores,REQUEST_DRIVEN_CONC, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_jd_conc_ro = worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN_CONC_RO, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_hybrid_conc = worst_fit_decreasing(task_vector, num_cores, HYBRID_CONC, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_fifo_conc = worst_fit_decreasing(task_vector, num_cores, FIFO_CONC, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+
+			std::cout << "Schedulability WFD:" << "\n";
+			std::cout << "Request-Driven        : " << sched_flag_rd << "\n";
+			std::cout << "Job-Driven            : " << sched_flag_jd << "\n";
+			std::cout << "Hybrid                : " << sched_flag_hybrid << "\n";
+			std::cout << "Request-Driven-Conc-S : " << sched_flag_rd_conc_simple << "\n";
+			std::cout << "Job-Driven-Conc       : " << sched_flag_jd_conc << "\n";
+			std::cout << "Request-Driven-Conc   : " << sched_flag_rd_conc << "\n";
+			std::cout << "Job-Driven-Conc-RO    : " << sched_flag_jd_conc_ro << "\n";
+			std::cout << "Hybrid-Conc           : " << sched_flag_hybrid_conc << "\n";
+			std::cout << "FIFO-Conc             : " << sched_flag_fifo_conc << "\n";
+			// std::cin.get();
+
+			// Update the schedulability counters
+			if (sched_flag_rd == 0)
+				counter_rd++;
+
+			if (sched_flag_jd == 0)
+				counter_jd++;
+
+			if (sched_flag_hybrid == 0)
+				counter_hybrid++;
+
+			if (sched_flag_rd_conc == 0)
+				counter_rd_conc++;
+
+			if (sched_flag_jd_conc == 0)
+				counter_jd_conc++;
+
+			if (sched_flag_rd_conc_simple == 0)
+				counter_rd_conc_simple++;
+
+			if (sched_flag_jd_conc_ro == 0)
+				counter_jd_conc_ro++;
+
+			if (sched_flag_hybrid_conc == 0)
+				counter_hybrid_conc++;
+
+			if (sched_flag_fifo_conc == 0)
+				counter_fifo_conc++;
+		}
 		
-		// Check Schedulability -> Concurrent approaches (simple)
-		resp_time_rd.clear();
-		req_blocking_rd.clear();
-		resp_time_jd.clear();
-		job_blocking_jd.clear();
-		sched_flag_rd_conc_simple = worst_fit_decreasing(task_vector, num_cores, REQUEST_DRIVEN_CONC_SIMPLE, resp_time_rd, resp_time_jd, 
-											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
-		sched_flag_jd_conc = worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN_CONC, resp_time_rd, resp_time_jd, 
-											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
-		
-		// Check Schedulability -> Concurrent approaches (complex)
-		resp_time_rd.clear();
-		req_blocking_rd.clear();
-		resp_time_jd.clear();
-		job_blocking_jd.clear();
-		sched_flag_rd_conc = worst_fit_decreasing(task_vector, num_cores,REQUEST_DRIVEN_CONC, resp_time_rd, resp_time_jd, 
-											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
-		sched_flag_jd_conc_ro = worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN_CONC_RO, resp_time_rd, resp_time_jd, 
-											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
-		sched_flag_hybrid_conc = worst_fit_decreasing(task_vector, num_cores, HYBRID_CONC, resp_time_rd, resp_time_jd, 
-											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
-		sched_flag_fifo_conc = worst_fit_decreasing(task_vector, num_cores, FIFO_CONC, resp_time_rd, resp_time_jd, 
-											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+		// Check Schedulability -> Using SyncAware WFD as task partitioning
+		{
+			// Check Schedulability -> Non-concurrent approaches
+			resp_time_rd.clear();
+			req_blocking_rd.clear();
+			resp_time_jd.clear();
+			sched_flag_rd = sync_aware_worst_fit_decreasing(task_vector, num_cores, REQUEST_DRIVEN, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_jd = sync_aware_worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_hybrid = sync_aware_worst_fit_decreasing(task_vector, num_cores, HYBRID, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			
+			// Check Schedulability -> Concurrent approaches (simple)
+			resp_time_rd.clear();
+			req_blocking_rd.clear();
+			resp_time_jd.clear();
+			job_blocking_jd.clear();
+			sched_flag_rd_conc_simple = sync_aware_worst_fit_decreasing(task_vector, num_cores, REQUEST_DRIVEN_CONC_SIMPLE, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_jd_conc = sync_aware_worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN_CONC, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			
+			// Check Schedulability -> Concurrent approaches (complex)
+			resp_time_rd.clear();
+			req_blocking_rd.clear();
+			resp_time_jd.clear();
+			job_blocking_jd.clear();
+			sched_flag_rd_conc = sync_aware_worst_fit_decreasing(task_vector, num_cores,REQUEST_DRIVEN_CONC, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_jd_conc_ro = sync_aware_worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN_CONC_RO, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_hybrid_conc = sync_aware_worst_fit_decreasing(task_vector, num_cores, HYBRID_CONC, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+			sched_flag_fifo_conc = sync_aware_worst_fit_decreasing(task_vector, num_cores, FIFO_CONC, resp_time_rd, resp_time_jd, 
+												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
 
-		std::cout << "Schedulability:" << "\n";
-		std::cout << "Request-Driven        : " << sched_flag_rd << "\n";
-		std::cout << "Job-Driven            : " << sched_flag_jd << "\n";
-		std::cout << "Hybrid                : " << sched_flag_hybrid << "\n";
-		std::cout << "Request-Driven-Conc-S : " << sched_flag_rd_conc_simple << "\n";
-		std::cout << "Job-Driven-Conc       : " << sched_flag_jd_conc << "\n";
-		std::cout << "Request-Driven-Conc   : " << sched_flag_rd_conc << "\n";
-		std::cout << "Job-Driven-Conc-RO    : " << sched_flag_jd_conc_ro << "\n";
-		std::cout << "Hybrid-Conc           : " << sched_flag_hybrid_conc << "\n";
-		std::cout << "FIFO-Conc             : " << sched_flag_fifo_conc << "\n";
-		// std::cin.get();
+			std::cout << "Schedulability SA-WFD :" << "\n";
+			std::cout << "Request-Driven        : " << sched_flag_rd << "\n";
+			std::cout << "Job-Driven            : " << sched_flag_jd << "\n";
+			std::cout << "Hybrid                : " << sched_flag_hybrid << "\n";
+			std::cout << "Request-Driven-Conc-S : " << sched_flag_rd_conc_simple << "\n";
+			std::cout << "Job-Driven-Conc       : " << sched_flag_jd_conc << "\n";
+			std::cout << "Request-Driven-Conc   : " << sched_flag_rd_conc << "\n";
+			std::cout << "Job-Driven-Conc-RO    : " << sched_flag_jd_conc_ro << "\n";
+			std::cout << "Hybrid-Conc           : " << sched_flag_hybrid_conc << "\n";
+			std::cout << "FIFO-Conc             : " << sched_flag_fifo_conc << "\n";
+			// std::cin.get();
 
-		// Update the schedulability counters
-		if (sched_flag_rd == 0)
-			counter_rd++;
+			// Update the schedulability counters
+			if (sched_flag_rd == 0)
+				sa_counter_rd++;
 
-		if (sched_flag_jd == 0)
-			counter_jd++;
+			if (sched_flag_jd == 0)
+				sa_counter_jd++;
 
-		if (sched_flag_hybrid == 0)
-			counter_hybrid++;
+			if (sched_flag_hybrid == 0)
+				sa_counter_hybrid++;
 
-		if (sched_flag_rd_conc == 0)
-			counter_rd_conc++;
+			if (sched_flag_rd_conc == 0)
+				sa_counter_rd_conc++;
 
-		if (sched_flag_jd_conc == 0)
-			counter_jd_conc++;
+			if (sched_flag_jd_conc == 0)
+				sa_counter_jd_conc++;
 
-		if (sched_flag_rd_conc_simple == 0)
-			counter_rd_conc_simple++;
+			if (sched_flag_rd_conc_simple == 0)
+				sa_counter_rd_conc_simple++;
 
-		if (sched_flag_jd_conc_ro == 0)
-			counter_jd_conc_ro++;
+			if (sched_flag_jd_conc_ro == 0)
+				sa_counter_jd_conc_ro++;
 
-		if (sched_flag_hybrid_conc == 0)
-			counter_hybrid_conc++;
+			if (sched_flag_hybrid_conc == 0)
+				sa_counter_hybrid_conc++;
 
-		if (sched_flag_fifo_conc == 0)
-			counter_fifo_conc++;
-		
+			if (sched_flag_fifo_conc == 0)
+				sa_counter_fifo_conc++;
+		}
 		// Compute utilization values for energy calculations
 		true_cpu_util = get_taskset_cpu_util(task_vector);
 		true_gpu_util = get_taskset_gpu_util(task_vector);
@@ -329,13 +420,24 @@ int main(int argc, char **argv)
 		        << counter_rd_conc_simple << ","
 		        << counter_jd_conc_ro << ","
 		        << counter_hybrid_conc << ","
-		        << counter_fifo_conc;
+		        << counter_fifo_conc << ","
+		        << sa_counter_rd << ","
+		        << sa_counter_jd << ","
+		        << sa_counter_hybrid << ","
+		        << sa_counter_rd_conc << ","
+		        << sa_counter_jd_conc << ","
+		        << sa_counter_rd_conc_simple << ","
+		        << sa_counter_jd_conc_ro << ","
+		        << sa_counter_hybrid_conc << ","
+		        << sa_counter_fifo_conc << "\n";
 		outfile.close();
 	}
 
 	std::cout << "Tasksets: " << taskset_count << "\n";
 	std::cout << "Avg. CPU Util :" << average_cpu_util << "\n";
 	std::cout << "Avg. GPU Util :" << average_gpu_util << "\n";
+	
+	std::cout << "WFD Schedulability " << "\n";
 	std::cout << "Request-Driven        : " << counter_rd << "\n";
 	std::cout << "Job-Driven            : " << counter_jd << "\n";
 	std::cout << "Hybrid                : " << counter_hybrid << "\n";
@@ -345,6 +447,17 @@ int main(int argc, char **argv)
 	std::cout << "Job-Driven-Conc-RO    : " << counter_jd_conc_ro << "\n";
 	std::cout << "Hybrid-Conc           : " << counter_hybrid_conc << "\n";
 	std::cout << "FIFO-Conc             : " << counter_fifo_conc << "\n";
+
+	std::cout << "SA-WFD Schedulability " << "\n";
+	std::cout << "Request-Driven        : " << sa_counter_rd << "\n";
+	std::cout << "Job-Driven            : " << sa_counter_jd << "\n";
+	std::cout << "Hybrid                : " << sa_counter_hybrid << "\n";
+	std::cout << "Request-Driven-Conc-S : " << sa_counter_rd_conc_simple << "\n";
+	std::cout << "Job-Driven-Conc       : " << sa_counter_jd_conc << "\n";
+	std::cout << "Request-Driven-Conc   : " << sa_counter_rd_conc << "\n";
+	std::cout << "Job-Driven-Conc-RO    : " << sa_counter_jd_conc_ro << "\n";
+	std::cout << "Hybrid-Conc           : " << sa_counter_hybrid_conc << "\n";
+	std::cout << "FIFO-Conc             : " << sa_counter_fifo_conc << "\n";
 
 	return 0;
 }

@@ -321,7 +321,7 @@ int main(int argc, char **argv)
 		        << counter_rd_conc_simple << ","
 		        << counter_jd_conc_ro << ","
 		        << counter_hybrid_conc << ","
-		        << counter_fifo_conc;
+		        << counter_fifo_conc << "\n";
 		outfile.close();
 	}
 

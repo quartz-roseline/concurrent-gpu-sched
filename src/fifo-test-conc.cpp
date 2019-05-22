@@ -1,6 +1,6 @@
 /*
- * @file hybrid-test.cpp
- * @brief Implementing the hybrid schedulability test for concurrent GPUs
+ * @file hybrid-test-conc.cpp
+ * @brief Implementing the fifo test for concurrent GPUs
  * @author Sandeep D'souza 
  * 
  * Copyright (c) Carnegie Mellon University, 2019. All rights reserved.
@@ -32,13 +32,13 @@
 #include <cstdlib>
 
 /* Internal Headers */
-#include "hybrid-test-conc.hpp"
+#include "fifo-test-conc.hpp"
 #include "indirect-cis.hpp"
 #include "taskset.hpp"
 #include "config.hpp"
 
-/**************** Calculate Prioritized Blocking using the hybrid approach sub-routine ********************/ 
-double calculate_prioritized_blocking_hybrid_conc(unsigned int index, double response_time, const std::vector<Task> &task_vector)
+/**************** Calculate Prioritized Blocking using the hybrid approach (same for fifo) sub-routine ********************/ 
+double calculate_prioritized_blocking_fifo_hybrid_conc(unsigned int index, double response_time, const std::vector<Task> &task_vector)
 {
 	double blocking = 0;
 	unsigned int theta = 0;
@@ -83,55 +83,74 @@ double calculate_prioritized_blocking_hybrid_conc(unsigned int index, double res
 	return blocking;
 }
 
-/**************** Calculate Extra Differential Direct blocking and prioritized blocking ********************/ 
-double calculate_blocking_hybrid_diff_conc(unsigned int index, const std::vector<Task> &task_vector, 
-								 const std::vector<double> &resp_time_hp, double resp_time)
+/**************** Calculate Per-Request Direct Blocking sub-routine ********************/ 
+double calculate_request_direct_blocking_fifo(unsigned int index, unsigned int req_index, const std::vector<Task> &task_vector, const std::vector<double> &resp_time_hp)
 {
 	double blocking = 0;
-	unsigned int num_gpu_segments = task_vector[index].getNumGPUSegments();
 
-	// Add the prioritized blocking using the hybrid approach -> faced by all tasks, even without gpu segments
-	blocking = blocking + calculate_prioritized_blocking_hybrid_conc(index, resp_time, task_vector);
+	// Return 0 blocking if task has no GPU execution
+	if(task_vector[index].getTotalGe() == 0)
+		return 0;
+	
+	// Estimate Blocking -> take the biggest wcrt gpu segment from each task
+	for (unsigned int i = 0; i < task_vector.size(); i++)
+	{
+		// Cannot be blocked by myself
+		if (i == index)
+			continue;
+
+		if (task_vector[i].getTotalGe() != 0)
+		{	
+			blocking = blocking + task_vector[i].getMaxH();	
+		}
+	}
+	return blocking;
+}
+
+/**************** Calculate Per-Request Blocking sub-routine ********************/ 
+double calculate_request_blocking_fifo(unsigned int index, unsigned int req_index, 
+									 const std::vector<Task> &task_vector, 
+									 const std::vector<double> &resp_time_hp)
+{
+	double direct_blocking, blocking = 0;
+	double G = task_vector[index].getG(req_index);
+
+	// Return 0 if GPU segment is zero
+	if (G == 0)
+		return 0;
+
+	// Compute the combined direct blocking, and the indirect and cis faced by the request
+	direct_blocking = calculate_request_direct_blocking_fifo(index, req_index, task_vector, resp_time_hp);
+	
+	blocking = direct_blocking
+	+ calculate_request_indirect_blocking(index, req_index, task_vector)
+	+ calculate_request_cis(index, req_index, task_vector);
 
 	return blocking;
 }
 
-/**************** Calculate Direct blocking due to high-prio tasks only ********************/ 
-double calculate_blocking_hybrid_direct_init_conc(unsigned int index, const std::vector<Task> &task_vector, 
-								 const std::vector<double> &resp_time_rd,		
-								 const std::vector<double> &resp_time_jd,
-								 const std::vector<std::vector<double>> &req_blocking,
-								 const std::vector<double> &job_blocking)
+/**************** Calculate Total Blocking sub-routine ********************/ 
+double calculate_blocking_fifo(unsigned int index, const std::vector<Task> &task_vector, 
+							 const std::vector<double> &resp_time_hp)
 {
 	double blocking = 0;
-	double rd_blocking = 0;
-	double jd_blocking = 0;
-	unsigned int num_gpu_segments_blk = task_vector[index].getNumGPUSegments(); // num gpu requests of blocked task
+	unsigned int num_gpu_segments = task_vector[index].getNumGPUSegments();
+	std::vector<double> empty_vector;
 
-	if (num_gpu_segments_blk == 0)
+	if (num_gpu_segments == 0)
 		return blocking;
-
-	// Compute the blocking due to the request-driven approach -> add individual request blockings
-	for (unsigned int req_index = 0; req_index < num_gpu_segments_blk; req_index++)
-	{ 
-		rd_blocking = rd_blocking + req_blocking[index][req_index];
+	
+	// Get the per-request blocking (direct, indirect and concurrency-induced serialization)
+	for (unsigned int req_index = 0; req_index < num_gpu_segments; req_index++)
+	{
+		blocking = blocking + calculate_request_blocking_fifo(index, req_index, task_vector, resp_time_hp);
 	}
-
-	// Get the blocking due to the job-driven approach
-	jd_blocking = job_blocking[index];
-
-	// Chose the minimum as the final direct blocking as both are valid bounds
-	if (jd_blocking < rd_blocking)
-		blocking = jd_blocking;
-	else
-		blocking = rd_blocking;
 
 	return blocking;
 }
 
 /**************** Calculate High-Priority Interference sub-routine ********************/ 
-double calculate_interference_hybrid_conc(unsigned int index, const std::vector<Task> &task_vector, 
-									 const std::vector<double> &resp_time_hp, double resp_time)
+double calculate_interference_fifo(unsigned int index, const std::vector<Task> &task_vector, const std::vector<double> &resp_time_hp, double resp_time)
 {
 	double interference = 0;
 	unsigned int coreID = task_vector[index].getCoreID();
@@ -149,40 +168,31 @@ double calculate_interference_hybrid_conc(unsigned int index, const std::vector<
 	return interference;
 }
 
-/**************** The Calculate High-Priority response time sub-routine using the hybrid approach ********************/ 
-std::vector<double> calculate_hp_resp_time_hybrid_conc(unsigned int index, const std::vector<Task> &task_vector, 
-													const std::vector<double> &resp_time_rd,
-													const std::vector<double> &resp_time_jd,
-													const std::vector<std::vector<double>> &req_blocking,
-													const std::vector<double> &job_blocking)
+/**************** The Calculate High-Priority response time sub-routine using the request-driven approach ********************/ 
+std::vector<double> calculate_hp_resp_time_fifo(unsigned int index, const std::vector<Task> &task_vector)
 {
-	double blocking, blocking_init, interference;
+	double blocking, prioritized_blocking;
 	double resp_time, resp_time_dash, init_resp_time;
 	double deadline;
 	std::vector<double> resp_time_hp(index, 0);
 
-	// Set the response time to the deadline initially (as we have to use low-prio in our blocking calc)
 	for (unsigned int i = 0; i < index; i++)
 	{
-		resp_time_hp[i] = task_vector[i].getD();
-	}
-
-	for (unsigned int i = 0; i < index; i++)
-	{
+		// Get the blocking
+		blocking = calculate_blocking_fifo(i, task_vector, resp_time_hp);
+		
 		// Calculate the blocking using the recurrence Wi = Ci + Gi + Bi + Interference
-		// -> here we use Hi instead of Gi to get the indirect and cis blocking taken care of
-		init_resp_time = task_vector[i].getC() + task_vector[i].getTotalH();
-		blocking_init = calculate_blocking_hybrid_direct_init_conc(i, task_vector, resp_time_rd, resp_time_jd, req_blocking, job_blocking);
+		init_resp_time = task_vector[i].getC() + task_vector[i].getTotalG() + blocking;
 		resp_time = init_resp_time;
 		resp_time_dash = 0;
 		deadline = task_vector[i].getD();
-		while (resp_time != resp_time_dash && resp_time <= deadline)
+		while (resp_time != resp_time_dash && resp_time <= 5*deadline)
 		{
 			resp_time = resp_time_dash;
-			// Get the blocking
-			blocking = blocking_init + calculate_blocking_hybrid_diff_conc(i, task_vector, resp_time_hp, resp_time);
-			interference = calculate_interference_hybrid_conc(i, task_vector, resp_time_hp, resp_time);
-			resp_time_dash = init_resp_time + blocking + interference;
+			// Add the prioritized blocking using the hybrid approach -> faced even by tasks with no gpu requests
+			prioritized_blocking =  calculate_prioritized_blocking_fifo_hybrid_conc(i, resp_time, task_vector);
+			resp_time_dash = init_resp_time + prioritized_blocking 
+							+ calculate_interference_fifo(i, task_vector, resp_time_hp, resp_time);
 		}
 		resp_time_hp[i] = resp_time;
 	}
@@ -190,22 +200,17 @@ std::vector<double> calculate_hp_resp_time_hybrid_conc(unsigned int index, const
 	return resp_time_hp;
 }
 
-/**************** Calculate Schedulability using the Hybrid Approach ********************/ 
-int check_schedulability_hybrid_conc(std::vector<Task> &task_vector,
-								const std::vector<double> &resp_time_rd,
-								const std::vector<double> &resp_time_jd,
-								const std::vector<std::vector<double>> &req_blocking,
-								const std::vector<double> &job_blocking)
+/**************** Calculate Schedulability using FIFO on the concurrent GPU ********************/ 
+int check_schedulability_fifo_conc(std::vector<Task> &task_vector)
 {
-	//l Pre-compute the response-time of each GPU segment
+	// Pre-compute the response-time of each GPU segment
 	pre_compute_gpu_response_time(task_vector);
 
 	if (DEBUG)
-		printf("Concurrent Hybrid Approach\n");
+		printf("FIFO Policy on the GPU Approach\n");
 
 	// Do the schedulability test
-	std::vector<double> resp_time = calculate_hp_resp_time_hybrid_conc(task_vector.size(), task_vector,
-																  resp_time_rd, resp_time_jd, req_blocking, job_blocking);
+	std::vector<double> resp_time = calculate_hp_resp_time_fifo(task_vector.size(), task_vector);
 
 	for (unsigned int index = 0; index < task_vector.size(); index++) 
 	{

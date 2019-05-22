@@ -32,7 +32,7 @@
 #include <cstdlib>
 
 /* Internal Headers */
-#include "job-driven-test.hpp"
+#include "job-driven-test-conc.hpp"
 #include "indirect-cis.hpp"
 #include "taskset.hpp"
 #include "config.hpp"

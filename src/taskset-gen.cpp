@@ -90,15 +90,18 @@ int UUniFast(int number_tasks, double utilization_bound, double task_upper_bound
 /**************** Generate a random taskset ********************/ 
 /* Params: number_gpu_tasks: number of tasks with gpu sections
 		   max_gpu_segments: maximum GPU segments per task 
+		   random_flag: if 1 set randomly, if not set to value
 		   per_task_gpu_segments: vector of gpu task segments per task */
-int generate_random_num_gpu_segments(int number_gpu_tasks, int max_gpu_segments, std::vector<int> &per_task_gpu_segments)
+int generate_random_num_gpu_segments(int number_gpu_tasks, int max_gpu_segments, int random_flag, std::vector<int> &per_task_gpu_segments)
 {
 	int i, random, total_segments = 0;
 	for (i = 0; i < per_task_gpu_segments.size(); i++)
 	{
 		random = rand();
-		if (max_gpu_segments > 1)
+		if (max_gpu_segments > 1 && random_flag)
 			per_task_gpu_segments[i] = (random % (max_gpu_segments - 1)) + 1;
+		else if (max_gpu_segments > 1)
+			per_task_gpu_segments[i] = max_gpu_segments;
 		else
 			per_task_gpu_segments[i] = 1;
 		total_segments = total_segments + per_task_gpu_segments[i];
@@ -113,8 +116,10 @@ int generate_random_num_gpu_segments(int number_gpu_tasks, int max_gpu_segments,
            utilization bound: taskset utilization desired
            gpu_utilization_bound: taskset utilization gpu bound 
            harmonic_flag: true indicates harmonic period
+           gpu_seg_random_flag: true indicates generate number of per task gpu segments randomly using max
+   		   max_gpu_fraction: maximum fraction of the GPU that a gpu request consumes
    Returns: Vector of Tasks, empty vector in case of error */
-std::vector<Task> generate_tasks(int number_tasks, int number_gpu_tasks, int max_gpu_segments, double utilization_bound, double gpu_utilization_bound, int harmonic_flag)
+std::vector<Task> generate_tasks(int number_tasks, int number_gpu_tasks, int max_gpu_segments, double utilization_bound, double gpu_utilization_bound, int harmonic_flag, int gpu_seg_random_flag, double max_gpu_fraction)
 {
 	int min_period = MIN_PERIOD;					        // in ms
 	int max_period = MAX_PERIOD;							// in ms
@@ -131,7 +136,7 @@ std::vector<Task> generate_tasks(int number_tasks, int number_gpu_tasks, int max
 	std::vector<int> per_task_gpu_segments(number_gpu_tasks, 1);
 
 	// Get the total number of GPU segments
-	total_gpu_segments = generate_random_num_gpu_segments(number_gpu_tasks, max_gpu_segments, per_task_gpu_segments);
+	total_gpu_segments = generate_random_num_gpu_segments(number_gpu_tasks, max_gpu_segments, gpu_seg_random_flag, per_task_gpu_segments);
 
 	// Generate utilization arrays
 	std::vector<double> utilization_array(number_tasks, 0.0);
@@ -201,8 +206,12 @@ std::vector<Task> generate_tasks(int number_tasks, int number_gpu_tasks, int max
 					G.Gm = cpu_intervention_bound;
 					G.Ge = G.Ge - cpu_intervention_bound;
 				}
-				random = rand() ;
+				random = rand();
 				G.F = ((double) ((random % (GPU_FRACTION_GRANULARITY - 1)) + 1))/GPU_FRACTION_GRANULARITY;
+				// Floor the fraction at the max gpu fraction
+				if (G.F > max_gpu_fraction)
+					G.F = max_gpu_fraction;
+
 				task_params.G.push_back(G);
 			}
 			

@@ -28,6 +28,8 @@
 #ifndef CONFIG_HPP
 #define CONFIG_HPP
 
+#define DEBUG 0
+
 // Taskset Generation Configuration
 #define CPU_TASK_UPPER_BOUND 0.4	/* Upper bound on the CPU task utilization */
 #define GPU_TASK_UPPER_BOUND 0.4    /* Upper bound on the GPU task utilization */
@@ -39,6 +41,7 @@
 #define MAX_TASKS_MC4 15            /* Maximum tasks for 4 cores */
 #define GPU_FRACTION_GRANULARITY 10 /* Maximum segments the GPU can be broken into */
 #define MAX_GPU_SEGMENTS 5          /* Maximum number of GPU segments */
+#define MAX_GPU_FRACTION 1.0        /* Maximum GPU Fraction           */
 
 // Floating point errors overflow compensation
 #define EPSILON_FLO 0.001           /* Term to compensate for ceil floor floating point errors*/

@@ -28,11 +28,10 @@
 #ifndef JOB_DRIVEN_HPP
 #define JOB_DRIVEN_HPP
 
-#define DEBUG 1
-
 #include <vector>
 
 #include "task.hpp"
+#include "config.hpp"
 
 /**************** Calculate Schedulability using the Job-Driven Approach ********************/ 
 /* Params: task_vector: vector of tasks 

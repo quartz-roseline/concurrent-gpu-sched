@@ -34,20 +34,54 @@
 /* Internal Headers */
 #include "task.hpp"
 
+/* Scheduling Type for Partitioning */
+enum sched_type
+{
+	REQUEST_DRIVEN 					= 0,
+	JOB_DRIVEN 						= 1,
+	HYBRID 							= 2,
+	REQUEST_DRIVEN_CONC_SIMPLE 		= 3,
+	JOB_DRIVEN_CONC 				= 4,
+	REQUEST_DRIVEN_CONC 			= 5,
+	JOB_DRIVEN_CONC_RO 				= 6,
+	HYBRID_CONC 					= 7,
+	FIFO_CONC 						= 8,
+	INVALID 						= 9
+};
+
 /**************** The WFD Partitioning Algorithm ********************/ 
 /* Params: task_vector       : vector of tasks 
 		   num_cores         : number of cores
+		   sched_mode        : which schedulability test to use
+		   resp_time_rd: vector of response times of each task (using the request-driven approach)
+		   resp_time_jd: vector of response times of each task (using the job-driven approach)
+		   req_blocking: direct blocking faced by individual requests (using the request-driven approach)
+		   job_blocking: direct blocking faced by individual requests (using the job-driven approach)
 		   priority_ordering : std::sort operator specifying priority ordering of tasks
    Returns: 0 if a feasible partition exists */
-int worst_fit_decreasing(std::vector<Task> &task_vector, int num_cores, std::function<bool(Task const &, Task const &)> priority_ordering);
+int worst_fit_decreasing(std::vector<Task> &task_vector, int num_cores, sched_type sched_mode,
+						 std::vector<double> &resp_time_rd,
+						 std::vector<double> &resp_time_jd,
+						 std::vector<std::vector<double>> &req_blocking_rd,
+						 std::vector<double> &job_blocking_jd,
+						 std::function<bool(Task const &, Task const &)> priority_ordering);
 
 /**************** The Synchronization-Aware WFD Partitioning Algorithm ********************/ 
 /* Params: task_vector       : vector of tasks 
 		   num_cores         : number of cores
+		   sched_mode        : which schedulability test to use
+		   resp_time_rd: vector of response times of each task (using the request-driven approach)
+		   resp_time_jd: vector of response times of each task (using the job-driven approach)
+		   req_blocking: direct blocking faced by individual requests (using the request-driven approach)
+		   job_blocking: direct blocking faced by individual requests (using the job-driven approach)
 		   priority_ordering : std::sort operator specifying priority ordering of tasks
    Returns: 0 if a feasible partition exists */
-int sync_aware_worst_fit_decreasing(std::vector<Task> &task_vector, int num_cores, std::function<bool(Task const &, Task const &)> priority_ordering);
-
+int sync_aware_worst_fit_decreasing(std::vector<Task> &task_vector, int num_cores, sched_type sched_mode,
+						 			std::vector<double> &resp_time_rd,
+									std::vector<double> &resp_time_jd,
+									std::vector<std::vector<double>> &req_blocking_rd,
+									std::vector<double> &job_blocking_jd,
+									std::function<bool(Task const &, Task const &)> priority_ordering);
 #endif
 
 

@@ -1,9 +1,9 @@
 /*
  * @file mcprocessor_exp.cpp
- * @brief Multi-core processor Experiments
+ * @brief Multi-processor Experiments
  * @author Sandeep D'souza 
  * 
- * Copyright (c) Carnegie Mellon University, 2018. All rights reserved.
+ * Copyright (c) Carnegie Mellon University, 2019. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, 
  * are permitted provided that the following conditions are met:
@@ -39,13 +39,8 @@
 #include "task.hpp"
 #include "taskset.hpp"
 #include "taskset-gen.hpp"
-#include "request-driven-test.hpp"
-#include "binary-search.hpp"
-#include "config.hpp"
-#include "energy.hpp"
-#include "cycle-solo.hpp"
-#include "cycle-tandem.hpp"
 #include "task_partitioning.hpp"
+#include "config.hpp"
 
 // Comparator class for ordering tasks using RMS
 struct CompareTaskPriorityRMS {
@@ -58,28 +53,37 @@ struct CompareTaskPriorityRMS {
 
 int main(int argc, char **argv)
 {
-	std::vector<Task> task_vector, scaled_task_vector;
-	double best_frequency_csc, best_frequency_csa, best_frequency_csi;
-	double best_cpufreq_ctg, best_gpufreq_ctg, best_cpufreq_cte, best_gpufreq_cte;
-	double best_frequency_up, best_frequency_low;
-	double energy_csc, energy_csa, energy_csi, energy_ctg, energy_ctb;
-	double sa_energy_csc, sa_energy_csa, sa_energy_csi, sa_energy_ctg, sa_energy_ctb;
+	std::vector<Task> task_vector;
 	double true_gpu_util, true_cpu_util;
 	int number_tasks;
 	int retval;
 	int number_gpu_tasks;
-	int sched_flag_wfd = 0;
-	int sched_flag_sawfd = 0;
-	int post_sched_flag = 0;
-	int wfd_taskset_counter = 0;
-	int sa_wfd_taskset_counter = 0;
-	int common_counter=0;
+	int taskset_counter = 0;
 
-	// Average Energy Counters
-	double avg_energy_csc = 0, avg_energy_csa = 0, avg_energy_csi = 0, avg_energy_ctg = 0, avg_energy_ctb = 0;
+	// Schedulability Flags
+	int sched_flag_rd = 0;
+	int sched_flag_jd = 0;
+	int sched_flag_hybrid = 0;
+	int sched_flag_rd_conc = 0;
+	int sched_flag_rd_conc_simple = 0;
+	int sched_flag_jd_conc = 0;
+	int sched_flag_jd_conc_ro = 0;
+	int sched_flag_hybrid_conc = 0;
+	int sched_flag_fifo_conc = 0;
 
-	// SA-WFD Average Energy Counters
-	double sa_avg_energy_csc = 0, sa_avg_energy_csa = 0, sa_avg_energy_csi = 0, sa_avg_energy_ctg = 0, sa_avg_energy_ctb = 0;
+	// Schedulability Counters
+	int counter_rd = 0;
+	int counter_jd = 0;
+	int counter_hybrid = 0;
+	int counter_rd_conc = 0;
+	int counter_rd_conc_simple = 0;
+	int counter_jd_conc = 0;
+	int counter_jd_conc_ro = 0;
+	int counter_hybrid_conc = 0;
+	int counter_fifo_conc = 0;
+
+	// Average Util counters
+	double average_cpu_util = 0, average_gpu_util = 0;
 
 	// Output Filestream
 	std::ofstream outfile;
@@ -90,268 +94,257 @@ int main(int argc, char **argv)
 	if (argc > 1)
 		taskset_count = std::atoi(argv[1]);
 
-	// Number of Cores
-	int num_cores = 1;
-	if (argc > 2)
-		num_cores = std::atoi(argv[2]);
-
 	// Generate only harmonic tasksets
 	int harmonic_flag = 0;
-	if (argc > 3)
-		harmonic_flag = std::atoi(argv[3]);
+	if (argc > 2)
+		harmonic_flag = std::atoi(argv[2]);
 
 	// Output filename
-	if (argc > 4)
+	if (argc > 3)
 	{
-		std::string filename(argv[4]);
+		std::string filename(argv[3]);
 		file_flag = 1;
 		outfile.open(filename, std::ios_base::app);
 	}
 
 	// Epsilon convergence factor
 	double epsilon = 0.01;
-	if (argc > 5)
-		epsilon = std::atof(argv[5]);
+	if (argc > 4)
+		epsilon = std::atof(argv[4]);
 
 	// CPU Utilization Bound
 	double utilization_bound = 0.5;
-	if (argc > 6)
-		utilization_bound = std::atof(argv[6]);
+	if (argc > 5)
+		utilization_bound = std::atof(argv[5]);
 
 	// GPU utilization bound
 	double gpu_utilization_bound = 0.3;
-	if (argc > 7)
-		gpu_utilization_bound = std::atof(argv[7]);
+	if (argc > 6)
+		gpu_utilization_bound = std::atof(argv[6]);
 
 	// Fraction of tasks with GPU segments
 	double gpu_task_fraction = 0.5;
-	int fraction_sweep_mode = 0;
-	if (argc > 8)
+	if (argc > 7)
 	{
-		gpu_task_fraction = std::atof(argv[8]);
-		fraction_sweep_mode = 1;
+		gpu_task_fraction = std::atof(argv[7]);
 	}
 
-	// Energy Constants
+	// Max Number of GPU segments
+	int number_gpu_segments = MAX_GPU_SEGMENTS;
+	if (argc > 8)
+	{
+		number_gpu_segments = std::atoi(argv[8]);
+	}
+
+	// Max number of tasks
+	int max_number_tasks = MAX_TASKS;
+	if (argc > 9)
+	{
+		max_number_tasks = std::atoi(argv[9]);
+	}
+
+	// Maximum GPU fraction
+	int max_gpu_fraction = MAX_GPU_FRACTION;
+	if (argc > 10)
+	{
+		max_gpu_fraction = std::atof(argv[10]);
+	}
+
+	// Modes (Sweep holding others constant)
+	/* 0 = CPU Util/GPU Util, 1 = Fraction of tasks with GPU segments, 2 = Number of gpu segments, 3 = max size (fraction) of GPU segment*/
+	int mode = 0; 
+	int num_gpu_seg_random_flag; // flag to decide if number of gpu segments is set randomly or not;
 	if (argc > 11)
 	{
-		// Flip the fraction sweep mode if we have are doing an energy sweep
-		fraction_sweep_mode = 0;
-		if (set_energy_constants(std::atof(argv[9]),std::atof(argv[10]),std::atof(argv[11])) < 0)
-		{
-			std::cout << "Negative energy constants not allowed\n";
-			return -1;
-		}
+		mode = std::atoi(argv[11]);;
+		std::cout << "Mode = " << mode << "\n";
 	}
+
+	// Number of Cores
+	int num_cores = 4;
+	if (argc > 12)
+	{
+		num_cores = std::atoi(argv[12]);
+	}
+
+	// Request-Driven Vectors
+	std::vector<double> resp_time_rd;
+	std::vector<std::vector<double>> req_blocking_rd;
+
+	// Job-Driven Vectors
+	std::vector<double> resp_time_jd;
+	std::vector<double> job_blocking_jd;
 
 	/* initialize random seed: */
   	srand (time(NULL));
 
-	while (wfd_taskset_counter < taskset_count && sa_wfd_taskset_counter < taskset_count)
+	while (taskset_counter < taskset_count)
 	{
-		if (fraction_sweep_mode == 1)
+		// Chose parameters based on mode
+		/* 0 = CPU Util/GPU Util, 1 = Fraction of tasks with GPU segments, 2 = Number of gpu segments, 3 = max size (fraction) of GPU segment*/
+		switch (mode)
 		{
-			number_tasks = MAX_TASKS_MC4;
-			number_gpu_tasks = floor(gpu_task_fraction*number_tasks);
-		}
-		else
-		{
-			number_tasks = (rand() % MAX_TASKS_MC4) + ceil(utilization_bound/CPU_TASK_UPPER_BOUND);
-			number_gpu_tasks = ceil(gpu_task_fraction*number_tasks); // Guarantees minimum fraction of tasks as specified
+			case 0:
+				number_tasks = (rand() % max_number_tasks) + 1;
+				number_gpu_tasks = ceil(gpu_task_fraction*number_tasks); // Guarantees minimum fraction of tasks as specified
+				num_gpu_seg_random_flag = 1;
+				break;
+			
+			case 1:
+				number_tasks = max_number_tasks;
+				number_gpu_tasks = floor(gpu_task_fraction*number_tasks);
+				num_gpu_seg_random_flag = 1;
+				break;
+			
+			case 2:
+				number_tasks = max_number_tasks;
+				number_gpu_tasks = floor(gpu_task_fraction*number_tasks);
+				num_gpu_seg_random_flag = 0;
+				break;
+
+			case 3:
+				number_tasks = (rand() % max_number_tasks) + 1;
+				number_gpu_tasks = ceil(gpu_task_fraction*number_tasks); // Guarantees minimum fraction of tasks as specified
+				num_gpu_seg_random_flag = 1;
+				break;
+			
+			default:
+				std::cout << "Invalid mode chosen, Exiting ..\n";
+				exit(1);
 		}
 
-		task_vector = generate_tasks(number_tasks, number_gpu_tasks, utilization_bound, gpu_utilization_bound, harmonic_flag);
+		std::cout << "Taskset " << taskset_counter << " NumTasks = " << number_tasks << " NumAccTasks = " << number_gpu_tasks<< std::endl;
+		task_vector = generate_tasks(number_tasks, number_gpu_tasks, number_gpu_segments, utilization_bound, gpu_utilization_bound, 
+									 harmonic_flag, num_gpu_seg_random_flag, max_gpu_fraction);
 
 		// If Task Vector is empty the try again
 		if (task_vector.empty())
 			continue;
 
-		std::cout << "Tasket " << wfd_taskset_counter << " " << sa_wfd_taskset_counter << "\n";
-
 		// Sort Vector based on Some Priority ordering (here RMS)
 		std::sort(task_vector.begin(), task_vector.end(), ComparePriorityRMS);
 
-		// Create a Partition
-		sched_flag_wfd = worst_fit_decreasing(task_vector, num_cores, ComparePriorityRMS);
+		print_taskset(task_vector);
 
-		// If taskset is schedulable then compute frequency
-		if (sched_flag_wfd == 0)
-		{
-			// Compute utilization values for energy calculations
-			true_cpu_util = get_taskset_cpu_util(task_vector);
-			true_gpu_util = get_taskset_gpu_util(task_vector);
+		// Check Schedulability -> Non-concurrent approaches
+		resp_time_rd.clear();
+		req_blocking_rd.clear();
+		resp_time_jd.clear();
+		sched_flag_rd = worst_fit_decreasing(task_vector, num_cores, REQUEST_DRIVEN, resp_time_rd, resp_time_jd, 
+											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+		sched_flag_jd = worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN, resp_time_rd, resp_time_jd, 
+											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+		sched_flag_hybrid = worst_fit_decreasing(task_vector, num_cores, HYBRID, resp_time_rd, resp_time_jd, 
+											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+		
+		// Check Schedulability -> Concurrent approaches (simple)
+		resp_time_rd.clear();
+		req_blocking_rd.clear();
+		resp_time_jd.clear();
+		job_blocking_jd.clear();
+		sched_flag_rd_conc_simple = worst_fit_decreasing(task_vector, num_cores, REQUEST_DRIVEN_CONC_SIMPLE, resp_time_rd, resp_time_jd, 
+											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+		sched_flag_jd_conc = worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN_CONC, resp_time_rd, resp_time_jd, 
+											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+		
+		// Check Schedulability -> Concurrent approaches (complex)
+		resp_time_rd.clear();
+		req_blocking_rd.clear();
+		resp_time_jd.clear();
+		job_blocking_jd.clear();
+		sched_flag_rd_conc = worst_fit_decreasing(task_vector, num_cores,REQUEST_DRIVEN_CONC, resp_time_rd, resp_time_jd, 
+											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+		sched_flag_jd_conc_ro = worst_fit_decreasing(task_vector, num_cores, JOB_DRIVEN_CONC_RO, resp_time_rd, resp_time_jd, 
+											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+		sched_flag_hybrid_conc = worst_fit_decreasing(task_vector, num_cores, HYBRID_CONC, resp_time_rd, resp_time_jd, 
+											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
+		sched_flag_fifo_conc = worst_fit_decreasing(task_vector, num_cores, FIFO_CONC, resp_time_rd, resp_time_jd, 
+											 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
 
-			// Initialize Variables
-			std::vector<double> best_freq_up_vec(num_cores, get_taskset_cpu_util(task_vector)/num_cores);
-			std::vector<double> best_freq_low_vec(num_cores, get_taskset_cpu_util(task_vector)/num_cores);
-			double best_frequency_up, best_frequency_low;
+		std::cout << "Schedulability:" << "\n";
+		std::cout << "Request-Driven        : " << sched_flag_rd << "\n";
+		std::cout << "Job-Driven            : " << sched_flag_jd << "\n";
+		std::cout << "Hybrid                : " << sched_flag_hybrid << "\n";
+		std::cout << "Request-Driven-Conc-S : " << sched_flag_rd_conc_simple << "\n";
+		std::cout << "Job-Driven-Conc       : " << sched_flag_jd_conc << "\n";
+		std::cout << "Request-Driven-Conc   : " << sched_flag_rd_conc << "\n";
+		std::cout << "Job-Driven-Conc-RO    : " << sched_flag_jd_conc_ro << "\n";
+		std::cout << "Hybrid-Conc           : " << sched_flag_hybrid_conc << "\n";
+		std::cout << "FIFO-Conc             : " << sched_flag_fifo_conc << "\n";
+		// std::cin.get();
 
-			// CycleSolo-CPU
-			auto start_c = std::chrono::high_resolution_clock::now();
-			retval = cycle_solo_cpu_mc(task_vector, best_freq_up_vec, best_freq_low_vec, 1);
-			best_frequency_csc = binary_search_cpu_frequency_range(task_vector, epsilon, 1.0, best_freq_up_vec[0], best_freq_low_vec[0]);
-			energy_csc = calculate_energy(true_cpu_util, true_gpu_util, best_frequency_csc, 1.0);
-			auto finish_c = std::chrono::high_resolution_clock::now();
+		// Update the schedulability counters
+		if (sched_flag_rd == 0)
+			counter_rd++;
 
-			// Initialize Variables
-			best_frequency_up = get_taskset_gpu_util(task_vector);
-			best_frequency_low = best_frequency_up;
+		if (sched_flag_jd == 0)
+			counter_jd++;
 
-			// CycleSolo-Accel
-			start_c = std::chrono::high_resolution_clock::now();
-			retval = cycle_solo_accel_mc(task_vector, &best_frequency_up, &best_frequency_low);
-			best_frequency_csa = binary_search_gpu_frequency_range(task_vector, epsilon, 1.0, best_frequency_up, best_frequency_low);
-			energy_csa = calculate_energy(true_cpu_util, true_gpu_util, 1.0, best_frequency_csa);
-			finish_c = std::chrono::high_resolution_clock::now();
+		if (sched_flag_hybrid == 0)
+			counter_hybrid++;
 
-			// Initialize Variables
-			best_frequency_up = get_taskset_cpu_util(task_vector)/num_cores;
-			best_frequency_low = best_frequency_up;
+		if (sched_flag_rd_conc == 0)
+			counter_rd_conc++;
 
-			// CycleSolo-ID
-			start_c = std::chrono::high_resolution_clock::now();
-			retval = cycle_solo_id_mc(task_vector, &best_frequency_up, &best_frequency_low);
-			best_frequency_csi = binary_search_common_frequency_range(task_vector, epsilon, best_frequency_up, best_frequency_low);
-			energy_csi = calculate_energy(true_cpu_util, true_gpu_util, best_frequency_csi, best_frequency_csi);
-			finish_c = std::chrono::high_resolution_clock::now();
+		if (sched_flag_jd_conc == 0)
+			counter_jd_conc++;
 
-			// Initialize Variables
-			best_cpufreq_ctg = best_frequency_csc;
-			best_gpufreq_ctg = best_frequency_csa;
+		if (sched_flag_rd_conc_simple == 0)
+			counter_rd_conc_simple++;
 
-			// CycleTandem Greedy Search
-			start_c = std::chrono::high_resolution_clock::now();
-			retval = cycle_tandem(task_vector, &best_cpufreq_ctg, &best_gpufreq_ctg, epsilon);
-			energy_ctg = calculate_energy(true_cpu_util, true_gpu_util, best_cpufreq_ctg, best_gpufreq_ctg);
-			finish_c = std::chrono::high_resolution_clock::now();
+		if (sched_flag_jd_conc_ro == 0)
+			counter_jd_conc_ro++;
 
-			// Initialize Variables
-			best_cpufreq_cte = best_frequency_csc;
-			best_gpufreq_cte = best_frequency_csa;
+		if (sched_flag_hybrid_conc == 0)
+			counter_hybrid_conc++;
 
-			// CycleTandem Greedy Search
-			start_c = std::chrono::high_resolution_clock::now();
-			retval = cycle_tandem_bruteforce(task_vector, &best_cpufreq_cte, &best_gpufreq_cte, epsilon);
-			energy_ctb = calculate_energy(true_cpu_util, true_gpu_util, best_cpufreq_cte, best_gpufreq_cte);
-			finish_c = std::chrono::high_resolution_clock::now();
+		if (sched_flag_fifo_conc == 0)
+			counter_fifo_conc++;
+		
+		// Compute utilization values for energy calculations
+		true_cpu_util = get_taskset_cpu_util(task_vector);
+		true_gpu_util = get_taskset_gpu_util(task_vector);
 
-			wfd_taskset_counter++;
-		}
-
-		// Create a Partition
-		sched_flag_sawfd = sync_aware_worst_fit_decreasing(task_vector, num_cores, ComparePriorityRMS);
-
-		// If taskset is schedulable then compute frequency
-		if (sched_flag_sawfd == 0 )
-		{
-			// Compute utilization values for energy calculations
-			true_cpu_util = get_taskset_cpu_util(task_vector);
-			true_gpu_util = get_taskset_gpu_util(task_vector);
-
-			// Initialize Variables
-			std::vector<double> best_freq_up_vec(num_cores, get_taskset_cpu_util(task_vector)/num_cores);
-			std::vector<double> best_freq_low_vec(num_cores, get_taskset_cpu_util(task_vector)/num_cores);
-			double best_frequency_up, best_frequency_low;
-
-			// CycleSolo-CPU
-			auto start_c = std::chrono::high_resolution_clock::now();
-			retval = cycle_solo_cpu_mc(task_vector, best_freq_up_vec, best_freq_low_vec, 1);
-			best_frequency_csc = binary_search_cpu_frequency_range(task_vector, epsilon, 1.0, best_freq_up_vec[0], best_freq_low_vec[0]);
-			sa_energy_csc = calculate_energy(true_cpu_util, true_gpu_util, best_frequency_csc, 1.0);
-			auto finish_c = std::chrono::high_resolution_clock::now();
-
-			// Initialize Variables
-			best_frequency_up = get_taskset_gpu_util(task_vector);
-			best_frequency_low = best_frequency_up;
-
-			// CycleSolo-Accel
-			start_c = std::chrono::high_resolution_clock::now();
-			retval = cycle_solo_accel_mc(task_vector, &best_frequency_up, &best_frequency_low);
-			best_frequency_csa = binary_search_gpu_frequency_range(task_vector, epsilon, 1.0, best_frequency_up, best_frequency_low);
-			sa_energy_csa = calculate_energy(true_cpu_util, true_gpu_util, 1.0, best_frequency_csa);
-			finish_c = std::chrono::high_resolution_clock::now();
-
-			// Initialize Variables
-			best_frequency_up = get_taskset_cpu_util(task_vector)/num_cores;
-			best_frequency_low = best_frequency_up;
-
-			// CycleSolo-ID
-			start_c = std::chrono::high_resolution_clock::now();
-			retval = cycle_solo_id_mc(task_vector, &best_frequency_up, &best_frequency_low);
-			best_frequency_csi = binary_search_common_frequency_range(task_vector, epsilon, best_frequency_up, best_frequency_low);
-			sa_energy_csi = calculate_energy(true_cpu_util, true_gpu_util, best_frequency_csi, best_frequency_csi);
-			finish_c = std::chrono::high_resolution_clock::now();
-
-			// Initialize Variables
-			best_cpufreq_ctg = best_frequency_csc;
-			best_gpufreq_ctg = best_frequency_csa;
-
-			// CycleTandem Greedy Search
-			start_c = std::chrono::high_resolution_clock::now();
-			retval = cycle_tandem(task_vector, &best_cpufreq_ctg, &best_gpufreq_ctg, epsilon);
-			sa_energy_ctg = calculate_energy(true_cpu_util, true_gpu_util, best_cpufreq_ctg, best_gpufreq_ctg);
-			finish_c = std::chrono::high_resolution_clock::now();
-
-			// Initialize Variables
-			best_cpufreq_cte = best_frequency_csc;
-			best_gpufreq_cte = best_frequency_csa;
-
-			// CycleTandem Greedy Search
-			start_c = std::chrono::high_resolution_clock::now();
-			retval = cycle_tandem_bruteforce(task_vector, &best_cpufreq_cte, &best_gpufreq_cte, epsilon);
-			sa_energy_ctb = calculate_energy(true_cpu_util, true_gpu_util, best_cpufreq_cte, best_gpufreq_cte);
-			finish_c = std::chrono::high_resolution_clock::now();
-
-			sa_wfd_taskset_counter++;
-		}
-		// Update the Average Energy Values
-		if (sched_flag_wfd == 0 && sched_flag_sawfd == 0)
-		{
-			avg_energy_csc = avg_energy_csc + energy_csc;
-			avg_energy_csa = avg_energy_csa + energy_csa; 
-			avg_energy_csi = avg_energy_csi + energy_csi; 
-			avg_energy_ctg = avg_energy_ctg + energy_ctg;
-			avg_energy_ctb = avg_energy_ctb + energy_ctb;
-
-			sa_avg_energy_csc = sa_avg_energy_csc + sa_energy_csc;
-			sa_avg_energy_csa = sa_avg_energy_csa + sa_energy_csa; 
-			sa_avg_energy_csi = sa_avg_energy_csi + sa_energy_csi; 
-			sa_avg_energy_ctg = sa_avg_energy_ctg + sa_energy_ctg;
-			sa_avg_energy_ctb = sa_avg_energy_ctb + sa_energy_ctb;
-			common_counter++;
-		}
+		// Update average utilization values
+		average_gpu_util = average_gpu_util + true_gpu_util;
+		average_cpu_util = average_cpu_util + true_cpu_util;
+		taskset_counter++;
 	}
 
-	// Update the Average Energy Values
-	avg_energy_csc = avg_energy_csc/common_counter;
-	avg_energy_csa = avg_energy_csa/common_counter; 
-	avg_energy_csi = avg_energy_csi/common_counter; 
-	avg_energy_ctg = avg_energy_ctg/common_counter;
-	avg_energy_ctb = avg_energy_ctb/common_counter;
-
-	sa_avg_energy_csc = sa_avg_energy_csc/common_counter;
-	sa_avg_energy_csa = sa_avg_energy_csa/common_counter; 
-	sa_avg_energy_csi = sa_avg_energy_csi/common_counter; 
-	sa_avg_energy_ctg = sa_avg_energy_ctg/common_counter;
-	sa_avg_energy_ctb = sa_avg_energy_ctb/common_counter;
+	// Compute the Average
+	average_gpu_util = average_gpu_util/taskset_count;
+	average_cpu_util = average_cpu_util/taskset_count;
 
 	// Write values to file
 	if (file_flag == 1)
-	{
-		outfile << wfd_taskset_counter << ","
-				<< avg_energy_csc << ","
-				<< avg_energy_csa << ","
-				<< avg_energy_csi << ","
-				<< avg_energy_ctg << ","
-				<< avg_energy_ctb << "\n";
-		outfile << sa_wfd_taskset_counter << ","
-				<< sa_avg_energy_csc << ","
-				<< sa_avg_energy_csa << ","
-				<< sa_avg_energy_csi << ","
-				<< sa_avg_energy_ctg << ","
-				<< sa_avg_energy_ctb << "\n";
+	{	
+		outfile << average_cpu_util << ","
+		        << average_gpu_util << ","
+		        << taskset_count << ","
+		        << counter_rd << ","
+		        << counter_jd << ","
+		        << counter_hybrid << ","
+		        << counter_rd_conc << ","
+		        << counter_jd_conc << ","
+		        << counter_rd_conc_simple << ","
+		        << counter_jd_conc_ro << ","
+		        << counter_hybrid_conc << ","
+		        << counter_fifo_conc;
 		outfile.close();
 	}
+
+	std::cout << "Tasksets: " << taskset_count << "\n";
+	std::cout << "Avg. CPU Util :" << average_cpu_util << "\n";
+	std::cout << "Avg. GPU Util :" << average_gpu_util << "\n";
+	std::cout << "Request-Driven        : " << counter_rd << "\n";
+	std::cout << "Job-Driven            : " << counter_jd << "\n";
+	std::cout << "Hybrid                : " << counter_hybrid << "\n";
+	std::cout << "Request-Driven-Conc-S : " << counter_rd_conc_simple << "\n";
+	std::cout << "Job-Driven-Conc       : " << counter_jd_conc << "\n";
+	std::cout << "Request-Driven-Conc   : " << counter_rd_conc << "\n";
+	std::cout << "Job-Driven-Conc-RO    : " << counter_jd_conc_ro << "\n";
+	std::cout << "Hybrid-Conc           : " << counter_hybrid_conc << "\n";
+	std::cout << "FIFO-Conc             : " << counter_fifo_conc << "\n";
 
 	return 0;
 }

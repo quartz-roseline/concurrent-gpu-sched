@@ -28,11 +28,10 @@
 #ifndef REQUEST_DRIVEN_HPP
 #define REQUEST_DRIVEN_HPP
 
-#define DEBUG 1
-
 #include <vector>
 
 #include "task.hpp"
+#include "config.hpp"
 
 /**************** Calculate Schedulability using the Request-Driven Approach ********************/ 
 /* Params: task_vector: vector of tasks 

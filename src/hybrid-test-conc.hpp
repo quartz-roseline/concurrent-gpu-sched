@@ -28,11 +28,10 @@
 #ifndef HYBRID_CONC_HPP
 #define HYBRID_CONC_HPP
 
-#define DEBUG 0
-
 #include <vector>
 
 #include "task.hpp"
+#include "config.hpp"
 
 /**************** Calculate Schedulability using the Hybrid Approach ********************/ 
 /* Params:  task_vector: vector of tasks 

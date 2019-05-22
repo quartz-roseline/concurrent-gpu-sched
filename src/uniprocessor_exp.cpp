@@ -48,6 +48,7 @@
 #include "request-driven-test-conc.hpp"
 #include "job-driven-test-conc.hpp"
 #include "hybrid-test-conc.hpp"
+#include "fifo-test-conc.hpp"
 
 // Comparator class for ordering tasks using RMS
 struct CompareTaskPriorityRMS {
@@ -76,6 +77,7 @@ int main(int argc, char **argv)
 	int sched_flag_jd_conc = 0;
 	int sched_flag_jd_conc_ro = 0;
 	int sched_flag_hybrid_conc = 0;
+	int sched_flag_fifo_conc = 0;
 
 	// Schedulability Counters
 	int counter_rd = 0;
@@ -86,6 +88,7 @@ int main(int argc, char **argv)
 	int counter_jd_conc = 0;
 	int counter_jd_conc_ro = 0;
 	int counter_hybrid_conc = 0;
+	int counter_fifo_conc = 0;
 
 	// Average Util counters
 	double average_cpu_util = 0, average_gpu_util = 0;
@@ -129,11 +132,9 @@ int main(int argc, char **argv)
 
 	// Fraction of tasks with GPU segments
 	double gpu_task_fraction = 0.5;
-	int fraction_sweep_mode = 0;
 	if (argc > 7)
 	{
 		gpu_task_fraction = std::atof(argv[7]);
-		fraction_sweep_mode = 1;
 	}
 
 	// Max Number of GPU segments
@@ -141,6 +142,30 @@ int main(int argc, char **argv)
 	if (argc > 8)
 	{
 		number_gpu_segments = std::atoi(argv[8]);
+	}
+
+	// Max number of tasks
+	int max_number_tasks = MAX_TASKS;
+	if (argc > 9)
+	{
+		max_number_tasks = std::atoi(argv[9]);
+	}
+
+	// Maximum GPU fraction
+	int max_gpu_fraction = MAX_GPU_FRACTION;
+	if (argc > 10)
+	{
+		max_gpu_fraction = std::atof(argv[10]);
+	}
+
+	// Modes (Sweep holding others constant)
+	/* 0 = CPU Util/GPU Util, 1 = Fraction of tasks with GPU segments, 2 = Number of gpu segments, 3 = max size (fraction) of GPU segment*/
+	int mode = 0; 
+	int num_gpu_seg_random_flag; // flag to decide if number of gpu segments is set randomly or not;
+	if (argc > 11)
+	{
+		mode = std::atoi(argv[11]);;
+		std::cout << "Mode = " << mode << "\n";
 	}
 
 	// Request-Driven Vectors
@@ -156,19 +181,42 @@ int main(int argc, char **argv)
 
 	while (taskset_counter < taskset_count)
 	{
-		if (fraction_sweep_mode == 1)
+		// Chose parameters based on mode
+		/* 0 = CPU Util/GPU Util, 1 = Fraction of tasks with GPU segments, 2 = Number of gpu segments, 3 = max size (fraction) of GPU segment*/
+		switch (mode)
 		{
-			number_tasks = MAX_TASKS;
-			number_gpu_tasks = floor(gpu_task_fraction*number_tasks);
-		}
-		else
-		{
-			number_tasks = (rand() % MAX_TASKS) + 1;
-			number_gpu_tasks = ceil(gpu_task_fraction*number_tasks); // Guarantees minimum fraction of tasks as specified
+			case 0:
+				number_tasks = (rand() % max_number_tasks) + 1;
+				number_gpu_tasks = ceil(gpu_task_fraction*number_tasks); // Guarantees minimum fraction of tasks as specified
+				num_gpu_seg_random_flag = 1;
+				break;
+			
+			case 1:
+				number_tasks = max_number_tasks;
+				number_gpu_tasks = floor(gpu_task_fraction*number_tasks);
+				num_gpu_seg_random_flag = 1;
+				break;
+			
+			case 2:
+				number_tasks = max_number_tasks;
+				number_gpu_tasks = floor(gpu_task_fraction*number_tasks);
+				num_gpu_seg_random_flag = 0;
+				break;
+
+			case 3:
+				number_tasks = (rand() % max_number_tasks) + 1;
+				number_gpu_tasks = ceil(gpu_task_fraction*number_tasks); // Guarantees minimum fraction of tasks as specified
+				num_gpu_seg_random_flag = 1;
+				break;
+			
+			default:
+				std::cout << "Invalid mode chosen, Exiting ..\n";
+				exit(1);
 		}
 
 		std::cout << "Taskset " << taskset_counter << " NumTasks = " << number_tasks << " NumAccTasks = " << number_gpu_tasks<< std::endl;
-		task_vector = generate_tasks(number_tasks, number_gpu_tasks, number_gpu_segments, utilization_bound, gpu_utilization_bound, harmonic_flag);
+		task_vector = generate_tasks(number_tasks, number_gpu_tasks, number_gpu_segments, utilization_bound, gpu_utilization_bound, 
+									 harmonic_flag, num_gpu_seg_random_flag, max_gpu_fraction);
 
 		// If Task Vector is empty the try again
 		if (task_vector.empty())
@@ -180,7 +228,7 @@ int main(int argc, char **argv)
 		print_taskset(task_vector);
 
 		// Check Schedulability -> Non-concurrent approaches
-		resp_time_jd.clear();
+		resp_time_rd.clear();
 		req_blocking_rd.clear();
 		resp_time_jd.clear();
 		sched_flag_rd = check_schedulability_request_driven(task_vector, resp_time_rd, req_blocking_rd);
@@ -188,7 +236,7 @@ int main(int argc, char **argv)
 		sched_flag_hybrid = check_schedulability_hybrid(task_vector, resp_time_rd, resp_time_jd, req_blocking_rd);
 		
 		// Check Schedulability -> Concurrent approaches (simple)
-		resp_time_jd.clear();
+		resp_time_rd.clear();
 		req_blocking_rd.clear();
 		resp_time_jd.clear();
 		job_blocking_jd.clear();
@@ -196,13 +244,14 @@ int main(int argc, char **argv)
 		sched_flag_jd_conc = check_schedulability_job_driven_conc(task_vector, resp_time_jd, job_blocking_jd, false);
 		
 		// Check Schedulability -> Concurrent approaches (complex)
-		resp_time_jd.clear();
+		resp_time_rd.clear();
 		req_blocking_rd.clear();
 		resp_time_jd.clear();
 		job_blocking_jd.clear();
 		sched_flag_rd_conc = check_schedulability_request_driven_conc(task_vector, resp_time_rd, req_blocking_rd, false);
 		sched_flag_jd_conc_ro = check_schedulability_job_driven_conc(task_vector, resp_time_jd, job_blocking_jd, true);
 		sched_flag_hybrid_conc = check_schedulability_hybrid_conc(task_vector, resp_time_rd, resp_time_jd, req_blocking_rd, job_blocking_jd);
+		sched_flag_fifo_conc = check_schedulability_fifo_conc(task_vector);
 
 		std::cout << "Schedulability:" << "\n";
 		std::cout << "Request-Driven        : " << sched_flag_rd << "\n";
@@ -213,6 +262,7 @@ int main(int argc, char **argv)
 		std::cout << "Request-Driven-Conc   : " << sched_flag_rd_conc << "\n";
 		std::cout << "Job-Driven-Conc-RO    : " << sched_flag_jd_conc_ro << "\n";
 		std::cout << "Hybrid-Conc           : " << sched_flag_hybrid_conc << "\n";
+		std::cout << "FIFO-Conc             : " << sched_flag_fifo_conc << "\n";
 		// std::cin.get();
 
 		// Update the schedulability counters
@@ -239,6 +289,9 @@ int main(int argc, char **argv)
 
 		if (sched_flag_hybrid_conc == 0)
 			counter_hybrid_conc++;
+
+		if (sched_flag_fifo_conc == 0)
+			counter_fifo_conc++;
 		
 		// Compute utilization values for energy calculations
 		true_cpu_util = get_taskset_cpu_util(task_vector);
@@ -267,7 +320,8 @@ int main(int argc, char **argv)
 		        << counter_jd_conc << ","
 		        << counter_rd_conc_simple << ","
 		        << counter_jd_conc_ro << ","
-		        << counter_hybrid_conc;
+		        << counter_hybrid_conc << ","
+		        << counter_fifo_conc;
 		outfile.close();
 	}
 
@@ -282,6 +336,7 @@ int main(int argc, char **argv)
 	std::cout << "Request-Driven-Conc   : " << counter_rd_conc << "\n";
 	std::cout << "Job-Driven-Conc-RO    : " << counter_jd_conc_ro << "\n";
 	std::cout << "Hybrid-Conc           : " << counter_hybrid_conc << "\n";
+	std::cout << "FIFO-Conc             : " << counter_fifo_conc << "\n";
 
 	return 0;
 }

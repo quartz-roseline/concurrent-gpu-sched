@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 
-UNIPROC_OBJ=uniprocessor_exp.o task.o taskset.o taskset-gen.o request-driven-test.o job-driven-test.o hybrid-test.o request-driven-test-conc.o job-driven-test-conc.o hybrid-test-conc.o indirect-cis.o config.hpp
-#MCPROC_OBJ=mcprocessor_exp.o task_partitioning.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-cpu-mc.o cycle-solo-accel-mc.o cycle-solo-id-mc.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
+UNIPROC_OBJ=uniprocessor_exp.o task.o taskset.o taskset-gen.o request-driven-test.o job-driven-test.o hybrid-test.o request-driven-test-conc.o job-driven-test-conc.o hybrid-test-conc.o fifo-test-conc.o indirect-cis.o config.hpp
+MCPROC_OBJ=mcprocessor_exp.o task_partitioning.o task.o taskset.o taskset-gen.o request-driven-test.o job-driven-test.o hybrid-test.o request-driven-test-conc.o job-driven-test-conc.o hybrid-test-conc.o fifo-test-conc.o indirect-cis.o config.hpp
 #MCPROC_SCHED_OBJ=mcprocessor_sched_exp.o task_partitioning.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-cpu-mc.o cycle-solo-accel-mc.o cycle-solo-id-mc.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
 #PAPEREX_OBJ=paper_examples.o cycle-tandem.o cycle-solo-cpu.o cycle-solo-accel.o cycle-solo-id.o task.o taskset.o taskset-gen.o request-driven-test.o binary-search.o energy.o config.hpp
 CFLAGS_NEW=-std=c++0x -g3
@@ -10,7 +10,7 @@ CC=g++
 
 #------------------------------------------------------------------------------
 
-all: uniprocessor_exp #mcprocessor_exp mcprocessor_sched_exp paper_examples
+all: uniprocessor_exp mcprocessor_exp #mcprocessor_sched_exp paper_examples
 
 task.o: task.cpp task.hpp config.hpp
 	$(CC) -c task.cpp -o task.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
@@ -45,14 +45,17 @@ job-driven-test-conc.o: job-driven-test-conc.cpp job-driven-test-conc.hpp config
 hybrid-test-conc.o: hybrid-test-conc.cpp hybrid-test-conc.hpp config.hpp
 	$(CC) -c hybrid-test-conc.cpp -o hybrid-test-conc.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
-# task_partitioning.o: task_partitioning.cpp task_partitioning.hpp config.hpp
-# 	$(CC) -c task_partitioning.cpp -o task_partitioning.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
+fifo-test-conc.o: fifo-test-conc.cpp fifo-test-conc.hpp config.hpp
+	$(CC) -c fifo-test-conc.cpp -o fifo-test-conc.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
+
+task_partitioning.o: task_partitioning.cpp task_partitioning.hpp config.hpp
+	$(CC) -c task_partitioning.cpp -o task_partitioning.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
 uniprocessor_exp.o: uniprocessor_exp.cpp config.hpp
 	$(CC) -c uniprocessor_exp.cpp -o uniprocessor_exp.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
-# mcprocessor_exp.o: mcprocessor_exp.cpp config.hpp
-# 	$(CC) -c mcprocessor_exp.cpp -o mcprocessor_exp.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
+mcprocessor_exp.o: mcprocessor_exp.cpp config.hpp
+	$(CC) -c mcprocessor_exp.cpp -o mcprocessor_exp.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
 # mcprocessor_sched_exp.o: mcprocessor_sched_exp.cpp config.hpp
 # 	$(CC) -c mcprocessor_sched_exp.cpp -o mcprocessor_sched_exp.o -l$(MYLIBRARIES) $(CFLAGS_NEW)
@@ -63,8 +66,8 @@ uniprocessor_exp.o: uniprocessor_exp.cpp config.hpp
 uniprocessor_exp: $(UNIPROC_OBJ)
 	$(CC) $(UNIPROC_OBJ) -o uniprocessor_exp.out -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
-# mcprocessor_exp: $(MCPROC_OBJ)
-# 	$(CC) $(MCPROC_OBJ) -o mcprocessor_exp -l$(MYLIBRARIES) $(CFLAGS_NEW)
+mcprocessor_exp: $(MCPROC_OBJ)
+	$(CC) $(MCPROC_OBJ) -o mcprocessor_exp.out -l$(MYLIBRARIES) $(CFLAGS_NEW)
 
 # mcprocessor_sched_exp: $(MCPROC_SCHED_OBJ)
 # 	$(CC) $(MCPROC_SCHED_OBJ) -o mcprocessor_sched_exp -l$(MYLIBRARIES) $(CFLAGS_NEW)

@@ -190,7 +190,7 @@ std::vector<Task> generate_tasks(int number_tasks, int number_gpu_tasks, int max
 			// Set the parameters
 			for (int j = 0; j < per_task_gpu_segments[i]; j++)
 			{
-				G.Ge = gpu_utilization_array[i]*task_params.T;
+				G.Ge = gpu_utilization_array[j]*task_params.T;
 				if (cpu_intervention_util*G.Ge < cpu_intervention_bound)
 				{
 					G.Gm = cpu_intervention_util*G.Ge;

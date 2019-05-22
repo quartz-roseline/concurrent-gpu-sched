@@ -135,6 +135,20 @@ double Task::getMaxGm() const
 	return getMaxGmLeqFraction(1);
 }
 
+double Task::getMinF() const
+{
+	double minF = 2;
+	if (num_gpu_segments > 0)
+	{
+		for (int i = 0; i < num_gpu_segments; i++)
+		{
+			if (getF(i) < minF)
+				minF = getF(i);
+		}
+	}
+	return minF;
+}
+
 double Task::getMaxF() const
 {
 	double maxF = 0;
@@ -203,7 +217,7 @@ double Task::getTotalH() const
 	{
 		for (int i = 0; i < num_gpu_segments; i++)
 		{
-			totalH = getH(i);
+			totalH = totalH + getH(i);
 		}
 	}
 	return totalH;

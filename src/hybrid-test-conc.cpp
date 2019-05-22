@@ -107,9 +107,8 @@ double calculate_blocking_hybrid_direct_init_conc(unsigned int index, const std:
 	double rd_blocking = 0;
 	double jd_blocking = 0;
 	unsigned int num_gpu_segments_blk = task_vector[index].getNumGPUSegments(); // num gpu requests of blocked task
-	unsigned int num_gpu_segments;
 
-	if (num_gpu_segments == 0)
+	if (num_gpu_segments_blk == 0)
 		return blocking;
 
 	// Compute the blocking due to the request-driven approach -> add individual request blockings
@@ -159,6 +158,7 @@ std::vector<double> calculate_hp_resp_time_hybrid_conc(unsigned int index, const
 {
 	double blocking, blocking_init, interference;
 	double resp_time, resp_time_dash, init_resp_time;
+	double deadline;
 	std::vector<double> resp_time_hp(index, 0);
 
 	// Set the response time to the deadline initially (as we have to use low-prio in our blocking calc)
@@ -175,7 +175,8 @@ std::vector<double> calculate_hp_resp_time_hybrid_conc(unsigned int index, const
 		blocking_init = calculate_blocking_hybrid_direct_init_conc(i, task_vector, resp_time_rd, resp_time_jd, req_blocking, job_blocking);
 		resp_time = init_resp_time;
 		resp_time_dash = 0;
-		while (resp_time != resp_time_dash)
+		deadline = task_vector[i].getD();
+		while (resp_time != resp_time_dash && resp_time <= deadline)
 		{
 			resp_time = resp_time_dash;
 			// Get the blocking

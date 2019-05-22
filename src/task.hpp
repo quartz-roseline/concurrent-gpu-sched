@@ -68,8 +68,9 @@ class Task
 	public:	double getMaxGm() const;
 	public:	double getMaxGmLeqFraction(double fraction) const;
 
-	// Get the maximum task GPU fractional requirement
+	// Get the maximum/minimum task GPU fractional requirement
 	public: double getMaxF() const;
+	public: double getMinF() const;
 
 	// Get the maximum task GPU fractional requirement after index
 	public: double getIndexMaxF(unsigned int index, unsigned int &max_index) const;

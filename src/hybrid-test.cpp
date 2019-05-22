@@ -165,7 +165,7 @@ double calculate_blocking_hybrid_direct_init(unsigned int index, const std::vect
 	unsigned int num_gpu_segments_blk = task_vector[index].getNumGPUSegments(); // num gpu requests of blocked task
 	unsigned int num_gpu_segments;
 
-	if (num_gpu_segments == 0)
+	if (num_gpu_segments_blk == 0)
 		return blocking;
 
 	// Calculate the direct blocking due to all hp requests
@@ -233,6 +233,7 @@ std::vector<double> calculate_hp_resp_time_hybrid(unsigned int index, const std:
 {
 	double blocking, blocking_init, interference;
 	double resp_time, resp_time_dash, init_resp_time;
+	double deadline;
 	std::vector<double> resp_time_hp(index, 0);
 
 	for (unsigned int i = 0; i < index; i++)
@@ -243,7 +244,8 @@ std::vector<double> calculate_hp_resp_time_hybrid(unsigned int index, const std:
 		blocking_init = calculate_blocking_hybrid_direct_init(i, task_vector, resp_time_rd, resp_time_jd, req_blocking);
 		resp_time = init_resp_time;
 		resp_time_dash = 0;
-		while (resp_time != resp_time_dash)
+		deadline = task_vector[i].getD();
+		while (resp_time != resp_time_dash && resp_time <= deadline)
 		{
 			resp_time = resp_time_dash;
 			// Get the blocking

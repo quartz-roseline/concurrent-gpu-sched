@@ -299,7 +299,8 @@ double find_next_max_lp_gpu_wcrt_segment(int index, double value, int &lp_index,
 	return H_max;
 }
 
-/* Find the length of the lp task with largest GPU segment in terms of WCRT, which is smaller than value and has larger fraction */
+/* Find the length of the lp task with largest GPU segment in terms of WCRT, 
+   which is smaller than value and has larger or equal fraction */
 /* Params: index       : task index in vector ordered by priority
 		   value       : value which wcrt should be less than or equal to
 		   num_biggest : the kth largest element to find (starting at 1st)

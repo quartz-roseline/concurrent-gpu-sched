@@ -38,7 +38,7 @@
 #define MAX_TASKS 10			    /* Maximum number of tasks */
 #define MAX_TASKS_MC4 15            /* Maximum tasks for 4 cores */
 #define GPU_FRACTION_GRANULARITY 10 /* Maximum segments the GPU can be broken into */
-#define MAX_GPU_SEGMENTS 10         /* Maximum number of GPU segments */
+#define MAX_GPU_SEGMENTS 5          /* Maximum number of GPU segments */
 
 // Floating point errors overflow compensation
 #define EPSILON_FLO 0.001           /* Term to compensate for ceil floor floating point errors*/

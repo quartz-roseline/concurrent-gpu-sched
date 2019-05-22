@@ -146,6 +146,7 @@ std::vector<double> calculate_hp_resp_time_jd(unsigned int index, const std::vec
 {
 	double blocking, interference;
 	double resp_time, resp_time_dash, init_resp_time;
+	double deadline;
 	std::vector<double> resp_time_hp(index, 0);
 
 	for (unsigned int i = 0; i < index; i++)
@@ -155,7 +156,8 @@ std::vector<double> calculate_hp_resp_time_jd(unsigned int index, const std::vec
 		init_resp_time = task_vector[i].getC() + task_vector[i].getTotalH();
 		resp_time = init_resp_time;
 		resp_time_dash = 0;
-		while (resp_time != resp_time_dash)
+		deadline = task_vector[i].getD();
+		while (resp_time != resp_time_dash && resp_time <= 5*deadline)
 		{
 			resp_time = resp_time_dash;
 			// Get the blocking

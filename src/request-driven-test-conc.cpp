@@ -299,6 +299,7 @@ std::vector<double> calculate_hp_resp_time_rdc(unsigned int index, const std::ve
 {
 	double blocking;
 	double resp_time, resp_time_dash, init_resp_time;
+	double deadline;
 	std::vector<double> resp_time_hp(index, 0);
 
 	// Set the response time to the deadline initially (as we have to use low-prio in our blocking calc)
@@ -311,12 +312,12 @@ std::vector<double> calculate_hp_resp_time_rdc(unsigned int index, const std::ve
 	{
 		// Get the blocking
 		blocking = calculate_blocking_rdc(i, task_vector, resp_time_hp, req_blocking);
-		
+		deadline = task_vector[i].getD();
 		// Calculate the blocking using the recurrence Wi = Ci + Gi + Bi + Interference
 		init_resp_time = task_vector[i].getC() + task_vector[i].getTotalG() + blocking;
 		resp_time = init_resp_time;
 		resp_time_dash = 0;
-		while (resp_time != resp_time_dash)
+		while (resp_time != resp_time_dash && resp_time <= 5*deadline)
 		{
 			resp_time = resp_time_dash;
 			resp_time_dash = init_resp_time + calculate_interference_rdc(i, task_vector, resp_time_hp, resp_time);

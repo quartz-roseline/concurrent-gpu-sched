@@ -42,6 +42,7 @@
 #define GPU_FRACTION_GRANULARITY 10 /* Maximum segments the GPU can be broken into */
 #define MAX_GPU_SEGMENTS 5          /* Maximum number of GPU segments */
 #define MAX_GPU_FRACTION 1.0        /* Maximum GPU Fraction           */
+#define FRACTION_TASKS_GPU 0.5      /* Fraction of tasks with GPU segments */
 
 // Floating point errors overflow compensation
 #define EPSILON_FLO 0.001           /* Term to compensate for ceil floor floating point errors*/

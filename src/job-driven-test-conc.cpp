@@ -205,17 +205,11 @@ double calculate_blocking_rojdc(unsigned int index, unsigned int &req_index, dou
 	// double direct_blocking_local = 0;
 	unsigned int num_gpu_segments = task_vector[index].getNumGPUSegments();
 
-	// Add the prioritized blocking using the job-driven approach
-	if (req_index == 0)
-		blocking = blocking + calculate_prioritized_blocking_jdc(index, resp_time, task_vector);
-	
 	if (num_gpu_segments == 0)
 		return blocking;
 
 	// Get the direct blocking
 	direct_blocking_local = calculate_direct_blocking_rojdc(index, req_index, used_mass, task_vector, resp_time_hp, resp_time);
-	// direct_blocking[index] = direct_blocking[index] + direct_blocking_local;
-	// std::cout << "direct blocking " << direct_blocking[index] << " " << direct_blocking_local << "\n";
 	blocking = blocking + direct_blocking_local;
 
 	return blocking;
@@ -390,11 +384,13 @@ std::vector<double> calculate_hp_resp_time_jdc(unsigned int index, const std::ve
 		// Calculate the blocking using the recurrence Wi = Ci + Gi + Bi + Interference
 		// -> here we use Hi instead of Gi to get the indirect and cis blocking taken care of
 		if (request_oriented)
-			init_resp_time = task_vector[i].getC();// + task_vector[i].getTotalH();
+			init_resp_time = task_vector[i].getC();
 		else
 			init_resp_time = task_vector[i].getC() + task_vector[i].getTotalH();
+		
 		resp_time = init_resp_time;
 		resp_time_dash = 0;
+
 		while ((resp_time != resp_time_dash || req_index < num_gpu_segments) && resp_time <= 5*deadline)
 		{
 			resp_time = resp_time_dash;
@@ -415,19 +411,22 @@ std::vector<double> calculate_hp_resp_time_jdc(unsigned int index, const std::ve
 			interference = calculate_interference_jdc(i, task_vector, resp_time_hp, resp_time);
 			resp_time_dash = init_resp_time + total_blocking + blocking + interference;
 
+			// Add the prioritized blocking for the request-oriented approach
+			if (request_oriented)
+				resp_time_dash = resp_time_dash + calculate_prioritized_blocking_jdc(i, resp_time, task_vector) + task_vector[i].getH(req_index);
+
 			// Increment the request index if we are using the request-oriented approach
 			if (request_oriented && resp_time == resp_time_dash)
 			{
 				total_blocking = total_blocking + blocking;
 				direct_blocking[i] = direct_blocking[i] + direct_blocking_local;
 				total_blocking = total_blocking + task_vector[i].getH(req_index);
+
 				// Subtract the H terms from the direct blocking -> as this is used by hybrid
 				for (unsigned int j = prev_req_index; j < req_index; j++)
 				{
-					direct_blocking[i] = direct_blocking[i] - task_vector[i].getH(req_index);
+					direct_blocking[i] = direct_blocking[i] - task_vector[i].getH(j);
 				}
-				// std::cout << "direct blocking " << direct_blocking[i] << " " << direct_blocking_local << "\n";
-				// std::cout << "total block "  << total_blocking << "\n";
 				req_index++;
 			}
 			else if (request_oriented)
@@ -437,10 +436,6 @@ std::vector<double> calculate_hp_resp_time_jdc(unsigned int index, const std::ve
 			}
 		}
 		resp_time_hp[i] = resp_time;
-		// both these should be commented out
-		// if (request_oriented)
-		// 	blocking = total_blocking;
-		// std::cout << i << " num_gpu_segments " << num_gpu_segments << " block " << blocking << "\n";
 	}
 
 	return resp_time_hp;

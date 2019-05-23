@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 		gpu_utilization_bound = std::atof(argv[6]);
 
 	// Fraction of tasks with GPU segments
-	double gpu_task_fraction = 0.5;
+	double gpu_task_fraction = FRACTION_TASKS_GPU;
 	if (argc > 7)
 	{
 		gpu_task_fraction = std::atof(argv[7]);
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
 	}
 
 	// Maximum GPU fraction
-	int max_gpu_fraction = MAX_GPU_FRACTION;
+	double max_gpu_fraction = MAX_GPU_FRACTION;
 	if (argc > 10)
 	{
 		max_gpu_fraction = std::atof(argv[10]);
@@ -224,7 +224,8 @@ int main(int argc, char **argv)
 				exit(1);
 		}
 
-		std::cout << "Taskset " << taskset_counter << " NumTasks = " << number_tasks << " NumAccTasks = " << number_gpu_tasks<< std::endl;
+		if (DEBUG)
+			std::cout << "Taskset " << taskset_counter << " NumTasks = " << number_tasks << " NumAccTasks = " << number_gpu_tasks<< std::endl;
 		task_vector = generate_tasks(number_tasks, number_gpu_tasks, number_gpu_segments, utilization_bound, gpu_utilization_bound, 
 									 harmonic_flag, num_gpu_seg_random_flag, max_gpu_fraction);
 
@@ -235,7 +236,8 @@ int main(int argc, char **argv)
 		// Sort Vector based on Some Priority ordering (here RMS)
 		std::sort(task_vector.begin(), task_vector.end(), ComparePriorityRMS);
 
-		print_taskset(task_vector);
+		if (DEBUG)
+			print_taskset(task_vector);
 
 		// Check Schedulability -> Using WFD as task partitioning
 		{
@@ -274,17 +276,20 @@ int main(int argc, char **argv)
 			sched_flag_fifo_conc = worst_fit_decreasing(task_vector, num_cores, FIFO_CONC, resp_time_rd, resp_time_jd, 
 												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
 
-			std::cout << "Schedulability WFD:" << "\n";
-			std::cout << "Request-Driven        : " << sched_flag_rd << "\n";
-			std::cout << "Job-Driven            : " << sched_flag_jd << "\n";
-			std::cout << "Hybrid                : " << sched_flag_hybrid << "\n";
-			std::cout << "Request-Driven-Conc-S : " << sched_flag_rd_conc_simple << "\n";
-			std::cout << "Job-Driven-Conc       : " << sched_flag_jd_conc << "\n";
-			std::cout << "Request-Driven-Conc   : " << sched_flag_rd_conc << "\n";
-			std::cout << "Job-Driven-Conc-RO    : " << sched_flag_jd_conc_ro << "\n";
-			std::cout << "Hybrid-Conc           : " << sched_flag_hybrid_conc << "\n";
-			std::cout << "FIFO-Conc             : " << sched_flag_fifo_conc << "\n";
+			if (DEBUG)
+			{
+				std::cout << "Schedulability WFD:" << "\n";
+				std::cout << "Request-Driven        : " << sched_flag_rd << "\n";
+				std::cout << "Job-Driven            : " << sched_flag_jd << "\n";
+				std::cout << "Hybrid                : " << sched_flag_hybrid << "\n";
+				std::cout << "Request-Driven-Conc-S : " << sched_flag_rd_conc_simple << "\n";
+				std::cout << "Job-Driven-Conc       : " << sched_flag_jd_conc << "\n";
+				std::cout << "Request-Driven-Conc   : " << sched_flag_rd_conc << "\n";
+				std::cout << "Job-Driven-Conc-RO    : " << sched_flag_jd_conc_ro << "\n";
+				std::cout << "Hybrid-Conc           : " << sched_flag_hybrid_conc << "\n";
+				std::cout << "FIFO-Conc             : " << sched_flag_fifo_conc << "\n";
 			// std::cin.get();
+			}
 
 			// Update the schedulability counters
 			if (sched_flag_rd == 0)
@@ -352,17 +357,20 @@ int main(int argc, char **argv)
 			sched_flag_fifo_conc = sync_aware_worst_fit_decreasing(task_vector, num_cores, FIFO_CONC, resp_time_rd, resp_time_jd, 
 												 req_blocking_rd, job_blocking_jd, ComparePriorityRMS);
 
-			std::cout << "Schedulability SA-WFD :" << "\n";
-			std::cout << "Request-Driven        : " << sched_flag_rd << "\n";
-			std::cout << "Job-Driven            : " << sched_flag_jd << "\n";
-			std::cout << "Hybrid                : " << sched_flag_hybrid << "\n";
-			std::cout << "Request-Driven-Conc-S : " << sched_flag_rd_conc_simple << "\n";
-			std::cout << "Job-Driven-Conc       : " << sched_flag_jd_conc << "\n";
-			std::cout << "Request-Driven-Conc   : " << sched_flag_rd_conc << "\n";
-			std::cout << "Job-Driven-Conc-RO    : " << sched_flag_jd_conc_ro << "\n";
-			std::cout << "Hybrid-Conc           : " << sched_flag_hybrid_conc << "\n";
-			std::cout << "FIFO-Conc             : " << sched_flag_fifo_conc << "\n";
-			// std::cin.get();
+			if (DEBUG)
+			{
+				std::cout << "Schedulability SA-WFD :" << "\n";
+				std::cout << "Request-Driven        : " << sched_flag_rd << "\n";
+				std::cout << "Job-Driven            : " << sched_flag_jd << "\n";
+				std::cout << "Hybrid                : " << sched_flag_hybrid << "\n";
+				std::cout << "Request-Driven-Conc-S : " << sched_flag_rd_conc_simple << "\n";
+				std::cout << "Job-Driven-Conc       : " << sched_flag_jd_conc << "\n";
+				std::cout << "Request-Driven-Conc   : " << sched_flag_rd_conc << "\n";
+				std::cout << "Job-Driven-Conc-RO    : " << sched_flag_jd_conc_ro << "\n";
+				std::cout << "Hybrid-Conc           : " << sched_flag_hybrid_conc << "\n";
+				std::cout << "FIFO-Conc             : " << sched_flag_fifo_conc << "\n";
+				// std::cin.get();
+			}
 
 			// Update the schedulability counters
 			if (sched_flag_rd == 0)

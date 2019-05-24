@@ -1,9 +1,9 @@
 /*
  * @file request-driven-test.cpp
  * @brief Implementing to calculate the hyperperiod for tasks with uint64_teger periods
- * @author Sandeep D'souza 
+ * @author Anon 
  * 
- * Copyright (c) Carnegie Mellon University, 2018. All rights reserved.
+ * Copyright (c) Anon, 2019. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, 
  * are permitted provided that the following conditions are met:
